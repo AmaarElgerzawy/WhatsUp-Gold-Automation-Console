@@ -1,0 +1,120 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+ENV/
+env/
+.env
+.venv
+
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+*.log
+
+# React build
+WebUI/Frontend/wug-ui/build/
+WebUI/Frontend/wug-ui/.pnp
+WebUI/Frontend/wug-ui/.pnp.js
+
+# Testing
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+.hypothesis/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Project specific
+WebUI/Backend/data/
+WebUI/Backend/__pycache__/
+*.pyc
+*.pyo
+
+# Excel and data files (optional - uncomment if you want to ignore these)
+# *.xlsx
+# *.xlsm
+# *.csv
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Credentials and secrets (IMPORTANT!)
+*.key
+*.pem
+*.p12
+secrets/
+.env.local
+.env.production
+.env.development
+
+# Backup files
+Config Backup/backups/
+Many Routers Config/bulk_sequence_logs/
+
+# Reporting state
+Reporting/state.json
+
+# Workspace files
+*.code-workspace
+
+# Sensitive configuration files (uncomment if you've added real credentials)
+# Config Backup/backup_config.py
+# Reporting/report_config.py
+# Bulk Changes/Code/db_config.py
+
+# Note: Config files (db_config.py, backup_config.py, report_config.py) use environment variables.
+# If you've hardcoded credentials in these files, uncomment the lines above to ignore them.
+# Better practice: Use .env file or environment variables for all sensitive data.

@@ -1,0 +1,100 @@
+# bulk_delete_wug.py
+# Usage: python bulk_delete_wug.py devices_to_delete.csv
+
+import csv, sys, pyodbc, traceback
+
+# ------------- CONFIG (edit) -------------
+CONNECTION_STRING = r"Driver={ODBC Driver 17 for SQL Server};Server=localhost;Database=WhatsUp;Trusted_Connection=yes;"
+CSV_PATH = sys.argv[1]
+# -----------------------------------------
+
+def debug(msg): 
+    print(msg)
+
+def connect():
+    conn = pyodbc.connect(CONNECTION_STRING, autocommit=False)
+    conn.autocommit = False
+    return conn
+
+def find_device_by_display(cursor, name):
+    cursor.execute("SELECT nDeviceID FROM Device WHERE sDisplayName = ?", name)
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+def find_device_by_address(cursor, addr):
+    cursor.execute("""
+        SELECT d.nDeviceID 
+        FROM Device d
+        JOIN NetworkInterface ni ON ni.nDeviceID = d.nDeviceID
+        WHERE ni.sNetworkAddress = ?
+    """, addr)
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+def delete_device(cursor, device_id):
+    # Order matters! Must delete dependencies first.
+
+    cursor.execute("DELETE FROM PivotDeviceToGroup WHERE nDeviceID = ?", device_id)
+    cursor.execute("DELETE FROM PivotActiveMonitorTypeToDevice WHERE nDeviceID = ?", device_id)
+    cursor.execute("DELETE FROM DeviceAttribute WHERE nDeviceID = ?", device_id)
+    cursor.execute("DELETE FROM Annotation WHERE nDeviceID = ?", device_id)
+    cursor.execute("DELETE FROM NetworkInterface WHERE nDeviceID = ?", device_id)
+    cursor.execute("DELETE FROM Device WHERE nDeviceID = ?", device_id)
+
+def main():
+    conn = connect()
+    cur = conn.cursor()
+
+    successes = 0
+    failures = []
+
+    with open(CSV_PATH, newline='', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        headers = [h.lower() for h in reader.fieldnames]
+
+        mode = None
+        if "sdisplayname" in headers:
+            mode = "display"
+        elif "snetworkaddress" in headers:
+            mode = "address"
+        else:
+            print("ERROR: CSV must contain sDisplayName OR sNetworkAddress.")
+            sys.exit(1)
+
+        for i, row in enumerate(reader, start=1):
+            try:
+                name = row.get("sDisplayName") or row.get("sdisplayname")
+                addr = row.get("sNetworkAddress") or row.get("snetworkaddress")
+
+                device_id = None
+                if mode == "display":
+                    device_id = find_device_by_display(cur, name)
+                else:
+                    device_id = find_device_by_address(cur, addr)
+
+                if not device_id:
+                    failures.append((i, name or addr, "Not found"))
+                    continue
+
+                delete_device(cur, device_id)
+                conn.commit()
+                successes += 1
+                debug(f"Deleted device {device_id} ({name or addr})")
+
+            except Exception as e:
+                conn.rollback()
+                failures.append((i, name or addr, str(e)))
+                debug(traceback.format_exc())
+
+    cur.close()
+    conn.close()
+
+    print("Done.")
+    print(f"Successes: {successes}; Failures: {len(failures)}")
+    if failures:
+        print("Failures:")
+        for f in failures:
+            print(f)
+
+if __name__ == "__main__":
+    main()

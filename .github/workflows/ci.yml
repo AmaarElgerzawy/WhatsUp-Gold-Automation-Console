@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  lint-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black
+      - name: Lint with flake8
+        run: |
+          flake8 WebUI/Backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 WebUI/Backend/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: true
+      - name: Check formatting with black
+        run: |
+          black --check WebUI/Backend/
+        continue-on-error: true
+
+  lint-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: Install dependencies
+        working-directory: WebUI/Frontend/wug-ui
+        run: npm ci
+      - name: Run linter
+        working-directory: WebUI/Frontend/wug-ui
+        run: npm run build
+        continue-on-error: true
