@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiCall } from "./utils/api";
 
 export default function ConfigBackups() {
   const [devices, setDevices] = useState([]);
@@ -7,7 +8,7 @@ export default function ConfigBackups() {
   const [content, setContent] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:8000/backups/devices")
+    apiCall("backups/devices")
       .then((res) => res.json())
       .then(setDevices);
   }, []);
@@ -15,14 +16,12 @@ export default function ConfigBackups() {
   const loadFiles = async (device) => {
     setSelectedDevice(device);
     setContent("");
-    const res = await fetch(`http://localhost:8000/backups/${device}`);
+    const res = await apiCall(`backups/${device}`);
     setFiles(await res.json());
   };
 
   const viewFile = async (file) => {
-    const res = await fetch(
-      `http://localhost:8000/backups/${selectedDevice}/${file}`
-    );
+    const res = await apiCall(`backups/${selectedDevice}/${file}`);
     const text = await res.text();
     setContent(text.replace(/\\n/g, "\n"));
   };

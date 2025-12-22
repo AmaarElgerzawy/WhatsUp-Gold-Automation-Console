@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
+import { apiCall } from "./utils/api";
 
 export default function ReportSchedule() {
   const [rows, setRows] = useState([]);
@@ -10,8 +11,13 @@ export default function ReportSchedule() {
   const [newCol, setNewCol] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:8000/reports/schedule")
-      .then((res) => res.json())
+    apiCall("reports/schedule")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Failed to load schedule: ${res.statusText}`);
+        }
+        return res.json();
+      })
       .then((data) => {
         const columnDefs = [
           {
@@ -89,9 +95,8 @@ export default function ReportSchedule() {
     const updated = [];
     gridApi.forEachNode((n) => updated.push(n.data));
 
-    await fetch("http://localhost:8000/reports/schedule", {
+    await apiCall("reports/schedule", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rows: updated }),
     });
 

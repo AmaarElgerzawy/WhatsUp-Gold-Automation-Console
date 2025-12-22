@@ -18,26 +18,26 @@ export default function History() {
 
       <div className="card" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
+        <button
             type="button"
             className={
               "button button--sm" +
               (tab === "configs" ? " button--primary" : " button--ghost")
             }
-            onClick={() => setTab("configs")}
-          >
+          onClick={() => setTab("configs")}
+        >
             Saved configs
-          </button>
-          <button
+        </button>
+        <button
             type="button"
             className={
               "button button--sm" +
               (tab === "logs" ? " button--primary" : " button--ghost")
             }
-            onClick={() => setTab("logs")}
-          >
+          onClick={() => setTab("logs")}
+        >
             Execution logs
-          </button>
+        </button>
         </div>
       </div>
 

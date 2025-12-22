@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiCall } from "./utils/api";
 
 function BulkChnages() {
   const [operation, setOperation] = useState("add");
@@ -26,7 +27,7 @@ function BulkChnages() {
     formData.append("log_name", logName.trim());
 
     try {
-      const res = await fetch("http://localhost:8000/run", {
+      const res = await apiCall("run", {
         method: "POST",
         body: formData,
       });

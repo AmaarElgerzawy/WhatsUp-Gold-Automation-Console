@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import CredentialsSelector from "./components/CredentialsSelector";
 import { getAllCredentials } from "./utils/credentials";
+import { apiCall } from "./utils/api";
 
 export default function SimpleCommands() {
   const [routers, setRouters] = useState("");
@@ -69,7 +70,7 @@ export default function SimpleCommands() {
     fd.append("log_name", logName.trim());
 
     try {
-      const res = await fetch("http://localhost:8000/routers/run-simple", {
+      const res = await apiCall("routers/run-simple", {
         method: "POST",
         body: fd,
       });

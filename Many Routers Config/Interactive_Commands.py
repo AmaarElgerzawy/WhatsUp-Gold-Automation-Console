@@ -210,5 +210,5 @@ for ip in ips:
         log_output += "\n" + err_msg + "\n"
 
     # Save log
-    log_file.write_text(log_output, encoding="utf-8")
+    # log_file.write_text(log_output, encoding="utf-8")
     sys.stdout.write(f"Log File saved")

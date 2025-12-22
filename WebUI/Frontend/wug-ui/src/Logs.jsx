@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiCall } from "./utils/api";
 
 export default function Logs() {
   const [logs, setLogs] = useState([]);
@@ -8,20 +9,20 @@ export default function Logs() {
   const [selectedLog, setSelectedLog] = useState(null);
 
   const loadLogs = async () => {
-    const res = await fetch("http://localhost:8000/logs");
+    const res = await apiCall("logs");
     setLogs(await res.json());
   };
 
   const viewLog = async (name) => {
     setSelectedLog(name);
-    const res = await fetch(`http://localhost:8000/logs/${name}`);
+    const res = await apiCall(`logs/${name}`);
     const text = await res.text();
     setContent(text.replace(/\\n/g, "\n"));
   };
 
   const deleteLog = async (name) => {
     if (!window.confirm("Delete this log?")) return;
-    await fetch(`http://localhost:8000/logs/${name}`, {
+    await apiCall(`logs/${name}`, {
       method: "DELETE",
     });
     if (selectedLog === name) {
@@ -50,9 +51,8 @@ export default function Logs() {
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/logs/${oldName}`, {
+      const res = await apiCall(`logs/${oldName}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ new_name: newName.trim() }),
       });
 
@@ -80,9 +80,7 @@ export default function Logs() {
 
   const downloadLog = async (name) => {
     try {
-      const res = await fetch(
-        `http://localhost:8000/logs/${name}?download=true`
-      );
+      const res = await apiCall(`logs/${name}?download=true`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");

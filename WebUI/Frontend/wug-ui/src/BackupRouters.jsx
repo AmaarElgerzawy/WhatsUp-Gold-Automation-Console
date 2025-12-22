@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { apiCall } from "./utils/api";
 
 export default function BackupRouters() {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/backup/routers")
+    apiCall("backup/routers")
       .then((res) => res.json())
       .then((data) => {
         setContent(data.content || "");
@@ -14,9 +15,8 @@ export default function BackupRouters() {
   }, []);
 
   const save = async () => {
-    await fetch("http://localhost:8000/backup/routers", {
+    await apiCall("backup/routers", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     });
 
@@ -37,7 +37,10 @@ export default function BackupRouters() {
         <span className="pill">Text editor</span>
       </div>
 
-      <section className="card" style={{overflow: "hidden", padding: "10px", boxSizing: "border-box"}}>
+      <section
+        className="card"
+        style={{ overflow: "hidden", padding: "10px", boxSizing: "border-box" }}
+      >
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -49,7 +52,7 @@ export default function BackupRouters() {
             padding: 12,
             borderRadius: 6,
             border: "1px solid #d1d5db",
-            width: "-webkit-fill-available"
+            width: "-webkit-fill-available",
           }}
           placeholder={`One router IP per line\nExample:\n192.168.1.1\n192.168.1.2`}
         />

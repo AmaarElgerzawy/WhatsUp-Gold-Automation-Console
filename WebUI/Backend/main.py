@@ -1,15 +1,35 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPBearer
+from typing import Optional
 import pandas as pd
 import subprocess
 import tempfile
 import pyodbc
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import shutil
 import json
+
+# Import auth module
+from auth import (
+    get_user_by_username,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    check_privilege,
+    require_privilege,
+    log_activity,
+    load_users,
+    save_users,
+    get_password_hash,
+    PAGE_PRIVILEGES,
+    ROLE_PRIVILEGES,
+    AVAILABLE_PRIVILEGES,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+)
 
 # ================= CONFIG =================
 BASEDIR = Path(__file__).resolve().parent
@@ -23,6 +43,9 @@ ROUTERS_FILE = CONFIG_BACKUP_DIR / "routers.txt"
 DATA_DIR = BASEDIR / "data"
 CONFIG_DIR = DATA_DIR / "configs"
 LOG_DIR = DATA_DIR / "logs"
+
+# Ensure data directories exist
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 REPORT_SCHEDULE_FILE = BASEDIR / ".." / ".." / "Reporting" /"report_schedule.xlsx"
 
@@ -64,7 +87,11 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# Security for optional auth endpoints
+security = HTTPBearer(auto_error=False)
 # ================= HELPERS =================
 def collect_logs(src_dir: Path, dest_dir: Path):
     if not src_dir.exists():
@@ -145,7 +172,8 @@ def run_bulk(
     operation: str = Form(...),
     file: UploadFile = File(...),
     config_name: str = Form(""),
-    log_name: str = Form("")
+    log_name: str = Form(""),
+    current_user: dict = Depends(get_current_user),
 ):
     if operation not in SCRIPTS:
         raise HTTPException(400, "Invalid operation")
@@ -190,6 +218,14 @@ def run_bulk(
         clean_stderr = sanitize_output(proc.stderr)
 
         save_log("bulk_operation", clean_stdout, clean_stderr, proc.returncode, log_name)
+        
+        # Log activity
+        log_activity(
+            current_user["id"],
+            "bulk_operation",
+            f"Executed {operation} operation with {len(df)} devices",
+            "bulk"
+        )
 
         return {
             "returncode": proc.returncode,
@@ -206,7 +242,8 @@ def run_interactive(
     password: str = Form(...),
     enable_password: str = Form(""),
     config_name: str = Form(""),
-    log_name: str = Form("")
+    log_name: str = Form(""),
+    current_user: dict = Depends(get_current_user),
 ):
     script_path = os.path.join(BulkCommandsBASEDIR, "Interactive_Commands.py")
 
@@ -239,6 +276,15 @@ def run_interactive(
         # Save log with custom name or timestamp
         save_log("interactive_commands", proc.stdout, proc.stderr, proc.returncode, log_name)
         
+        # Log activity
+        router_count = len([r for r in routers.splitlines() if r.strip()])
+        log_activity(
+            current_user["id"],
+            "interactive_commands",
+            f"Ran Tasks on {router_count} router(s)",
+            "routers"
+        )
+        
         return {
             "returncode": proc.returncode,
             "stdout": proc.stdout,
@@ -246,6 +292,12 @@ def run_interactive(
         }
 
     except Exception as e:
+        log_activity(
+            current_user["id"],
+            "interactive_commands_error",
+            f"Error: {str(e)}",
+            "routers"
+        )
         return {
             "returncode": -1,
             "stdout": "",
@@ -260,7 +312,8 @@ def run_simple(
     password: str = Form(...),
     enable_password: str = Form(""),
     config_name: str = Form(""),
-    log_name: str = Form("")
+    log_name: str = Form(""),
+    current_user: dict = Depends(get_current_user),
 ):
     script_path = os.path.join(BulkCommandsBASEDIR, "Simple_Config.py")
 
@@ -299,6 +352,15 @@ def run_simple(
 
         # Save log with custom name or timestamp
         save_log("simple_commands", proc.stdout, proc.stderr, proc.returncode, log_name)
+        
+        # Log activity
+        router_count = len([r for r in routers.splitlines() if r.strip()])
+        log_activity(
+            current_user["id"],
+            "simple_commands",
+            f"Ran simple config on {router_count} router(s)",
+            "routers"
+        )
 
         return {
             "returncode": proc.returncode,
@@ -306,16 +368,378 @@ def run_simple(
             "stderr": proc.stderr,
         }
 
+# ================= AUTHENTICATION =================
+@app.post("/auth/login")
+def login(username: str = Form(...), password: str = Form(...)):
+    """Login endpoint."""
+    user = get_user_by_username(username)
+    if not user or not verify_password(password, user["password_hash"]):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password"
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["id"]}, expires_delta=access_token_expires
+    )
+    
+    # Log login activity
+    log_activity(user["id"], "login", f"User {username} logged in", "login")
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "email": user.get("email", ""),
+            "role": user["role"],
+            "privileges": user.get("privileges", []),
+        }
+    }
+
+
+@app.get("/auth/me")
+def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Get current user information."""
+    return {
+        "id": current_user["id"],
+        "username": current_user["username"],
+        "email": current_user.get("email", ""),
+        "role": current_user["role"],
+        "privileges": current_user.get("privileges", []),
+    }
+
+
+@app.get("/auth/check-page-access")
+def check_page_access(page: str, current_user: dict = Depends(get_current_user)):
+    """Check if user has access to a page."""
+    required_privilege = PAGE_PRIVILEGES.get(page)
+    if not required_privilege:
+        return {"has_access": False, "reason": "Unknown page"}
+    
+    has_access = check_privilege(current_user, required_privilege)
+    return {
+        "has_access": has_access,
+        "required_privilege": required_privilege,
+        "user_privileges": current_user.get("privileges", []),
+    }
+
+
+# ================= ADMIN ENDPOINTS =================
+@app.get("/admin/users")
+def list_users(current_user: dict = Depends(require_privilege("admin_access"))):
+    """List all users (admin only)."""
+    log_activity(current_user["id"], "list_users", "Viewed user list", "admin")
+    users = load_users()
+    # Remove password hashes from response
+    return [
+        {
+            "id": u["id"],
+            "username": u["username"],
+            "email": u.get("email", ""),
+            "role": u["role"],
+            "privileges": u.get("privileges", []),
+            "active": u.get("active", True),
+            "created_at": u.get("created_at", ""),
+        }
+        for u in users
+    ]
+
+
+@app.post("/admin/users")
+def create_user(
+    username: str = Form(...),
+    password: str = Form(...),
+    email: str = Form(""),
+    role: str = Form("operator"),
+    privileges_json: str = Form(""),  # JSON array of privilege strings
+    current_user: dict = Depends(require_privilege("admin_access")),
+):
+    """Create a new user (admin only)."""
+    users = load_users()
+    
+    # Check if username already exists
+    if any(u["username"] == username for u in users):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Parse privileges from JSON, or use role defaults
+    # Always prioritize privileges_json if provided
+    if privileges_json and privileges_json.strip():
+        try:
+            privileges = json.loads(privileges_json)
+            if not isinstance(privileges, list):
+                raise ValueError("Privileges must be a list")
+            if len(privileges) == 0:
+                raise HTTPException(status_code=400, detail="At least one privilege must be selected")
+            # Validate privileges
+            all_privileges = [p["id"] for p in AVAILABLE_PRIVILEGES]
+            invalid = [p for p in privileges if p not in all_privileges]
+            if invalid:
+                raise HTTPException(status_code=400, detail=f"Invalid privileges: {invalid}")
+            # When custom privileges are provided, always use them regardless of role
+            # Set role to "custom" if it's not a standard role
+            if role not in ROLE_PRIVILEGES:
+                role = "custom"
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid privileges JSON: {str(e)}")
+    else:
+        # Use role defaults only if no custom privileges provided
+        if role not in ROLE_PRIVILEGES:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(list(ROLE_PRIVILEGES.keys()) + ['custom'])}")
+        privileges = ROLE_PRIVILEGES.get(role, [])
+    
+    new_user = {
+        "id": username.lower().replace(" ", "_"),
+        "username": username,
+        "email": email,
+        "password_hash": get_password_hash(password),
+        "role": role,  # Keep role for backward compatibility
+        "privileges": privileges,
+        "active": True,
+        "created_at": datetime.now().isoformat(),
+    }
+    
+    users.append(new_user)
+    save_users(users)
+    
+    log_activity(
+        current_user["id"],
+        "create_user",
+        f"Created user: {username} with privileges: {', '.join(privileges)}",
+        "admin"
+    )
+    
+    return {
+        "id": new_user["id"],
+        "username": new_user["username"],
+        "email": new_user["email"],
+        "role": new_user["role"],
+        "privileges": new_user["privileges"],
+    }
+
+
+@app.put("/admin/users/{user_id}")
+def update_user(
+    user_id: str,
+    username: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    role: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    active: Optional[bool] = Form(None),
+    privileges_json: Optional[str] = Form(None),
+    current_user: dict = Depends(require_privilege("admin_access")),
+):
+    """Update a user (admin only)."""
+    users = load_users()
+    user_index = None
+    
+    for i, u in enumerate(users):
+        if u["id"] == user_id:
+            user_index = i
+            break
+    
+    if user_index is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user = users[user_index]
+    
+    # Prevent deleting the last admin
+    if user.get("privileges", []).count("admin_access") > 0 and active is False:
+        admin_count = sum(1 for u in users if "admin_access" in u.get("privileges", []) and u.get("active", True))
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="Cannot deactivate the last admin user")
+    
+    if username is not None:
+        # Check if new username conflicts
+        if any(u["username"] == username and u["id"] != user_id for u in users):
+            raise HTTPException(status_code=400, detail="Username already exists")
+        user["username"] = username
+    
+    if email is not None:
+        user["email"] = email
+    
+    if role is not None:
+        # Allow "custom" role and any standard role
+        if role != "custom" and role not in ROLE_PRIVILEGES:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(list(ROLE_PRIVILEGES.keys()) + ['custom'])}")
+        user["role"] = role
+        # Only update privileges from role if custom privileges not provided
+        if privileges_json is None or privileges_json.strip() == "":
+            if role in ROLE_PRIVILEGES:
+                user["privileges"] = ROLE_PRIVILEGES[role]
+            # If role is "custom" and no privileges provided, keep existing privileges
+    
+    # Update privileges if provided (takes precedence over role)
+    if privileges_json is not None and privileges_json.strip():
+        try:
+            privileges = json.loads(privileges_json)
+            if not isinstance(privileges, list):
+                raise ValueError("Privileges must be a list")
+            if len(privileges) == 0:
+                raise HTTPException(status_code=400, detail="At least one privilege must be selected")
+            # Validate privileges
+            all_privileges = [p["id"] for p in AVAILABLE_PRIVILEGES]
+            invalid = [p for p in privileges if p not in all_privileges]
+            if invalid:
+                raise HTTPException(status_code=400, detail=f"Invalid privileges: {invalid}")
+            user["privileges"] = privileges
+            # If custom privileges provided, update role to "custom" if it's not a standard role
+            if role is not None and role not in ROLE_PRIVILEGES:
+                user["role"] = "custom"
+            elif role is None and user.get("role") not in ROLE_PRIVILEGES:
+                # If no role specified but user has custom privileges, set role to custom
+                user["role"] = "custom"
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid privileges JSON: {str(e)}")
+    
+    if password is not None and password.strip():
+        user["password_hash"] = get_password_hash(password)
+    
+    if active is not None:
+        user["active"] = active
+    
+    users[user_index] = user
+    save_users(users)
+    
+    log_activity(
+        current_user["id"],
+        "update_user",
+        f"Updated user: {user_id} ({user.get('username', 'unknown')}) with privileges: {', '.join(user.get('privileges', []))}",
+        "admin"
+    )
+    
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user.get("email", ""),
+        "role": user["role"],
+        "privileges": user["privileges"],
+        "active": user.get("active", True),
+    }
+
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(
+    user_id: str,
+    current_user: dict = Depends(require_privilege("admin_access")),
+):
+    """Delete a user (admin only)."""
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    users = load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent deleting the last admin (user with admin_access privilege)
+    if "admin_access" in user.get("privileges", []):
+        admin_count = sum(1 for u in users if "admin_access" in u.get("privileges", []) and u.get("active", True))
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="Cannot delete the last admin user")
+    
+    users = [u for u in users if u["id"] != user_id]
+    save_users(users)
+    
+    log_activity(
+        current_user["id"],
+        "delete_user",
+        f"Deleted user: {user_id} ({user['username']})",
+        "admin"
+    )
+    
+    return {"status": "deleted"}
+
+
+@app.get("/admin/activity")
+def get_activity_log(
+    limit: int = 500,
+    user_id: Optional[str] = None,
+    current_user: dict = Depends(require_privilege("admin_access")),
+):
+    """Get activity log (admin only)."""
+    from auth import ACTIVITY_LOG_FILE
+    
+    if not ACTIVITY_LOG_FILE.exists():
+        log_activity(current_user["id"], "view_activity_log", "Viewed activity log (empty)", "admin")
+        return []
+    
+    try:
+        with open(ACTIVITY_LOG_FILE, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+        if not isinstance(logs, list):
+            logs = []
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        logs = []
+    
+    # Filter by user if specified
+    if user_id:
+        logs = [log for log in logs if log.get("user_id") == user_id]
+    
+    # Sort by timestamp (most recent first) and return limited results
+    logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    result = logs[:limit]
+    
+    log_activity(current_user["id"], "view_activity_log", f"Viewed {len(result)} activity log entries", "admin")
+    return result
+
+
+@app.get("/admin/stats")
+def get_admin_stats(current_user: dict = Depends(require_privilege("admin_access"))):
+    """Get admin statistics."""
+    users = load_users()
+    from auth import ACTIVITY_LOG_FILE
+    
+    active_users = sum(1 for u in users if u.get("active", True))
+    total_users = len(users)
+    
+    # Count activities in last 24 hours
+    recent_activities = 0
+    if ACTIVITY_LOG_FILE.exists():
+        try:
+            with open(ACTIVITY_LOG_FILE, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+            cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
+            recent_activities = sum(1 for log in logs if log.get("timestamp", "") > cutoff)
+        except (json.JSONDecodeError, FileNotFoundError):
+            pass
+    
+    return {
+        "total_users": total_users,
+        "active_users": active_users,
+        "recent_activities_24h": recent_activities,
+    }
+
+
+@app.get("/admin/privileges")
+def get_admin_privileges_list(current_user: dict = Depends(require_privilege("admin_access"))):
+    """Get list of available privileges with their descriptions."""
+    from auth import AVAILABLE_PRIVILEGES
+    return {
+        "privileges": AVAILABLE_PRIVILEGES,
+        "page_privileges": PAGE_PRIVILEGES,
+    }
+
+
 # ================= VIEW / DELETE =================
 @app.get("/configs/{section}")
-def list_configs(section: str):
+def list_configs(section: str, current_user: dict = Depends(get_current_user)):
+    log_activity(current_user["id"], "list_configs", f"Listed configs in {section}", "history")
     return os.listdir(CONFIG_DIR / section)
 
 @app.get("/configs/{section}/{name}")
-def get_config(section: str, name: str, download: bool = False):
+def get_config(
+    section: str, name: str, download: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
     file_path = CONFIG_DIR / section / name
     if not file_path.exists():
         raise HTTPException(404, "File not found")
+    
+    log_activity(current_user["id"], "view_config", f"Viewed {section}/{name}", "history")
     
     if download:
         return FileResponse(
@@ -327,12 +751,16 @@ def get_config(section: str, name: str, download: bool = False):
     return file_path.read_text()
 
 @app.delete("/configs/{section}/{name}")
-def delete_config(section: str, name: str):
+def delete_config(section: str, name: str, current_user: dict = Depends(get_current_user)):
     os.remove(CONFIG_DIR / section / name)
+    log_activity(current_user["id"], "delete_config", f"Deleted {section}/{name}", "history")
     return {"status": "deleted"}
 
 @app.put("/configs/{section}/{name}")
-def rename_config(section: str, name: str, payload: dict = Body(...)):
+def rename_config(
+    section: str, name: str, payload: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
     old_path = CONFIG_DIR / section / name
     new_name = payload.get("new_name", "").strip()
     
@@ -355,17 +783,24 @@ def rename_config(section: str, name: str, payload: dict = Body(...)):
         raise HTTPException(404, "File not found")
     
     old_path.rename(new_path)
+    log_activity(current_user, "Rename Config File", f"Rename Config File {name} -> {sanitized}{old_ext}", section)
     return {"status": "renamed", "new_name": f"{sanitized}{old_ext}"}
 
 @app.get("/logs")
-def list_logs():
+def list_logs(current_user: dict = Depends(get_current_user)):
+    log_activity(current_user["id"], "list_logs", "Listed log files", "history")
     return os.listdir(LOG_DIR)
 
 @app.get("/logs/{name}")
-def get_log(name: str, download: bool = False):
+def get_log(
+    name: str, download: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
     file_path = LOG_DIR / name
     if not file_path.exists():
         raise HTTPException(404, "File not found")
+    
+    log_activity(current_user["id"], "view_log", f"Viewed log: {name}", "history")
     
     if download:
         return FileResponse(
@@ -377,12 +812,16 @@ def get_log(name: str, download: bool = False):
     return file_path.read_text()
 
 @app.delete("/logs/{name}")
-def delete_log(name: str):
+def delete_log(name: str, current_user: dict = Depends(get_current_user)):
     os.remove(LOG_DIR / name)
+    log_activity(current_user["id"], "delete_log", f"Deleted log: {name}", "history")
     return {"status": "deleted"}
 
 @app.put("/logs/{name}")
-def rename_log(name: str, payload: dict = Body(...)):
+def rename_log(
+    name: str, payload: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
     old_path = LOG_DIR / name
     new_name = payload.get("new_name", "").strip()
     
@@ -405,50 +844,61 @@ def rename_log(name: str, payload: dict = Body(...)):
         raise HTTPException(404, "File not found")
     
     old_path.rename(new_path)
+    log_activity(current_user, "Rename Config File", f"Rename Config File {name} -> {sanitized}{old_ext}", "logs")
     return {"status": "renamed", "new_name": f"{sanitized}{old_ext}"}
 
 # ================= Backup =================
 @app.get("/backups/devices")
-def list_backup_devices():
+def list_backup_devices(current_user: dict = Depends(get_current_user)):
     if not BACKUP_BASE_DIR.exists():
         return []
 
+    log_activity(current_user["id"], "list_backup_devices", "Listed backup devices", "backups")
     return [
         d.name for d in BACKUP_BASE_DIR.iterdir()
         if d.is_dir()
     ]
 
 @app.get("/backups/{device}")
-def list_device_configs(device: str):
+def list_device_configs(device: str, current_user: dict = Depends(get_current_user)):
     device_dir = BACKUP_BASE_DIR / device
     if not device_dir.exists():
         raise HTTPException(404, "Device not found")
 
+    log_activity(current_user["id"], "list_device_configs", f"Listed configs for {device}", "backups")
     return [
         f.name for f in device_dir.iterdir()
         if f.is_file()
     ]
 
 @app.get("/backups/{device}/{filename}")
-def view_backup_file(device: str, filename: str):
+def view_backup_file(
+    device: str, filename: str,
+    current_user: dict = Depends(get_current_user)
+):
     file_path = BACKUP_BASE_DIR / device / filename
 
     if not file_path.exists():
         raise HTTPException(404, "File not found")
 
+    log_activity(current_user["id"], "view_backup", f"Viewed {device}/{filename}", "backups")
     return file_path.read_text(encoding="utf-8", errors="ignore")
 
 @app.get("/backup/routers")
-def get_backup_routers():
+def get_backup_routers(current_user: dict = Depends(get_current_user)):
     if not ROUTERS_FILE.exists():
         return {"content": ""}
 
+    log_activity(current_user["id"], "view_backup_routers", "Viewed backup routers list", "backups")
     return {
         "content": ROUTERS_FILE.read_text(encoding="utf-8")
     }
 
 @app.post("/backup/routers")
-def save_backup_routers(payload: dict = Body(...)):
+def save_backup_routers(
+    payload: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
     content = payload.get("content", "")
 
     # normalize newlines & strip junk
@@ -463,14 +913,21 @@ def save_backup_routers(payload: dict = Body(...)):
         encoding="utf-8"
     )
 
+    log_activity(
+        current_user["id"],
+        "save_backup_routers",
+        f"Updated backup routers list ({len(lines)} routers)",
+        "backups"
+    )
     return {"status": "ok"}
 # ================= Reporting =================
 @app.get("/reports/schedule")
-def get_report_schedule():
+def get_report_schedule(current_user: dict = Depends(get_current_user)):
     if not REPORT_SCHEDULE_FILE.exists():
         raise HTTPException(404, "report_schedule.xlsx not found")
 
     df = pd.read_excel(REPORT_SCHEDULE_FILE)
+    log_activity(current_user["id"], "view_report_schedule", "Viewed report schedule", "reports")
 
     return {
         "columns": list(df.columns),
@@ -478,13 +935,22 @@ def get_report_schedule():
     }
 
 @app.post("/reports/schedule")
-def save_report_schedule(payload: dict):
+def save_report_schedule(
+    payload: dict,
+    current_user: dict = Depends(require_privilege("manage_reports"))
+):
     if not REPORT_SCHEDULE_FILE.exists():
         raise HTTPException(404, "report_schedule.xlsx not found")
 
     try:
         df = pd.DataFrame(payload["rows"])
         df.to_excel(REPORT_SCHEDULE_FILE, index=False)
+        log_activity(
+            current_user["id"],
+            "save_report_schedule",
+            f"Updated report schedule with {len(df)} entries",
+            "reports"
+        )
         return {"status": "saved"}
     except Exception as e:
         raise HTTPException(500, str(e))

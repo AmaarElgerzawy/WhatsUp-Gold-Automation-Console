@@ -18,27 +18,27 @@ export default function RouterCommands() {
 
       <div className="card" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
+        <button
             type="button"
             className={
               "button button--sm" +
               (tab === "simple" ? " button--primary" : " button--ghost")
             }
-            onClick={() => setTab("simple")}
-          >
+          onClick={() => setTab("simple")}
+        >
             Simple config
-          </button>
+        </button>
 
-          <button
+        <button
             type="button"
             className={
               "button button--sm" +
               (tab === "interactive" ? " button--primary" : " button--ghost")
             }
-            onClick={() => setTab("interactive")}
-          >
+          onClick={() => setTab("interactive")}
+        >
             Interactive builder
-          </button>
+        </button>
         </div>
       </div>
 

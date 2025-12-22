@@ -69,7 +69,7 @@ for ip in ips:
         # ⬇️ CHANGE 3: make output visible to API/UI
         print(output, flush=True)
 
-        log_file.write_text(output, encoding="utf-8")
+        # log_file.write_text(output, encoding="utf-8")
 
     except Exception as e:
         err_msg = f"ERROR on {ip}: {e}"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiCall } from "./utils/api";
 
 const SECTIONS = [
   "bulk_add",
@@ -17,20 +18,20 @@ export default function SavedConfigs() {
   const [selectedFile, setSelectedFile] = useState(null);
 
   const loadFiles = async () => {
-    const res = await fetch(`http://localhost:8000/configs/${section}`);
+    const res = await apiCall(`configs/${section}`);
     setFiles(await res.json());
   };
 
   const viewFile = async (name) => {
     setSelectedFile(name);
-    const res = await fetch(`http://localhost:8000/configs/${section}/${name}`);
+    const res = await apiCall(`configs/${section}/${name}`);
     const text = await res.text();
     setContent(text.replace(/\\n/g, "\n"));
   };
 
   const deleteFile = async (name) => {
     if (!window.confirm("Delete this config?")) return;
-    await fetch(`http://localhost:8000/configs/${section}/${name}`, {
+    await apiCall(`configs/${section}/${name}`, {
       method: "DELETE",
     });
     if (selectedFile === name) {
@@ -59,14 +60,10 @@ export default function SavedConfigs() {
     }
 
     try {
-      const res = await fetch(
-        `http://localhost:8000/configs/${section}/${oldName}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ new_name: newName.trim() }),
-        }
-      );
+      const res = await apiCall(`configs/${section}/${oldName}`, {
+        method: "PUT",
+        body: JSON.stringify({ new_name: newName.trim() }),
+      });
 
       if (!res.ok) {
         const error = await res.json();
@@ -92,9 +89,7 @@ export default function SavedConfigs() {
 
   const downloadFile = async (name) => {
     try {
-      const res = await fetch(
-        `http://localhost:8000/configs/${section}/${name}?download=true`
-      );
+      const res = await apiCall(`configs/${section}/${name}?download=true`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");

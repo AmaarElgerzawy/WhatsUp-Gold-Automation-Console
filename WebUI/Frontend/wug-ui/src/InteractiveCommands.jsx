@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import CredentialsSelector from "./components/CredentialsSelector";
 import { getAllCredentials } from "./utils/credentials";
+import { apiCall } from "./utils/api";
 
 export default function InteractiveCommands() {
   const [routers, setRouters] = useState("");
@@ -97,7 +98,7 @@ export default function InteractiveCommands() {
     formData.append("log_name", logName.trim());
 
     try {
-      const res = await fetch("http://localhost:8000/routers/run-interactive", {
+      const res = await apiCall("routers/run-interactive", {
         method: "POST",
         body: formData,
       });
