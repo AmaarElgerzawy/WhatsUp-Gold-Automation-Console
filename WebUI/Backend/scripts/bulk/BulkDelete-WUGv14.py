@@ -9,7 +9,7 @@ CSV_PATH = sys.argv[1]
 # -----------------------------------------
 
 def debug(msg): 
-    print(msg)
+    print(msg, flush=True)
 
 def connect():
     conn = pyodbc.connect(CONNECTION_STRING, autocommit=False)
@@ -58,7 +58,7 @@ def main():
         elif "snetworkaddress" in headers:
             mode = "address"
         else:
-            print("ERROR: CSV must contain sDisplayName OR sNetworkAddress.")
+            print("ERROR: CSV must contain sDisplayName OR sNetworkAddress.", file=sys.stderr)
             sys.exit(1)
 
         for i, row in enumerate(reader, start=1):
@@ -84,17 +84,18 @@ def main():
             except Exception as e:
                 conn.rollback()
                 failures.append((i, name or addr, str(e)))
-                debug(traceback.format_exc())
+                print("ERROR: Error traceback:", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr, flush=True)
 
     cur.close()
     conn.close()
 
-    print("Done.")
-    print(f"Successes: {successes}; Failures: {len(failures)}")
+    print("Done.", flush=True)
+    print(f"Successes: {successes}; Failures: {len(failures)}", flush=True)
     if failures:
-        print("Failures:")
+        print("Failures:", file=sys.stderr)
         for f in failures:
-            print(f)
+            print(f, file=sys.stderr, flush=True)
 
 if __name__ == "__main__":
     main()

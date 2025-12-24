@@ -1,0 +1,54 @@
+# Backend Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    unixodbc-dev \
+    curl \
+    gnupg \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Microsoft ODBC Driver for SQL Server
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+    && curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql18 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code (all scripts are now in WebUI/Backend/scripts/)
+COPY WebUI/Backend/ ./WebUI/Backend/
+
+# Create necessary directories
+RUN mkdir -p WebUI/Backend/data/configs/{bulk_add,bulk_update,bulk_delete,router_simple,router_interactive} \
+    && mkdir -p WebUI/Backend/data/logs \
+    && mkdir -p WebUI/Backend/data/backups
+
+# Expose port
+EXPOSE 8000
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV WUG_JWT_SECRET=${WUG_JWT_SECRET:-change-this-secret-key-in-production-min-32-chars}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/docs || exit 1
+
+# Copy entrypoint script
+COPY docker/entrypoint-backend.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Run the application
+CMD ["uvicorn", "WebUI.Backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

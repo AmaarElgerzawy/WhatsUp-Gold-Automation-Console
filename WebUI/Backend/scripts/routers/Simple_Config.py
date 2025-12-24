@@ -26,10 +26,10 @@ for line in Path(ROUTER_LIST_FILE).read_text().splitlines():
         ips.append(line)
 
 if not ips:
-    sys.stderr.write("No router IPs found\n")
-    raise SystemExit(1)
+    print("ERROR: No router IPs found", file=sys.stderr)
+    sys.exit(1)
 
-sys.stderr.write(f"Found {len(ips)} router(s)\n")
+print(f"Found {len(ips)} router(s)")
 
 # ---------- CREDENTIALS ----------
 # ⬇️ CHANGE 2: creds from API
@@ -38,14 +38,14 @@ password = os.environ.get("WUG_SSH_PASS")
 enable_password = os.environ.get("WUG_SSH_ENABLE", password)
 
 if not username or not password:
-    sys.stderr.write("Missing SSH credentials\n")
-    raise SystemExit(1)
+    print("ERROR: Missing SSH credentials", file=sys.stderr)
+    sys.exit(1)
 
 # ---------- MAIN LOOP ----------
 timestamp_global = datetime.now().strftime("%Y%m%d-%H%M%S")
 
 for ip in ips:
-    sys.stderr.write(f"\n=== Connecting to {ip} ===\n")
+    print(f"\n=== Connecting to {ip} ===")
 
     device = {
         "device_type": "cisco_ios",
@@ -73,5 +73,5 @@ for ip in ips:
 
     except Exception as e:
         err_msg = f"ERROR on {ip}: {e}"
-        sys.stderr.write(err_msg + "\n")
-        log_file.write_text(err_msg, encoding="utf-8")
+        print(err_msg, file=sys.stderr)
+        # log_file.write_text(err_msg, encoding="utf-8")

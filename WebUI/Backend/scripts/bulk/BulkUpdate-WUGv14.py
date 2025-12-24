@@ -7,7 +7,7 @@ CSV_PATH = sys.argv[1]
 # ---------------------------------------------
 
 def debug(msg):
-    print(msg)
+    print(msg, flush=True)
 
 def connect():
     conn = pyodbc.connect(CONNECTION_STRING, autocommit=False)
@@ -212,18 +212,18 @@ def main():
             except Exception as e:
                 conn.rollback()
                 failures.append((i, normalized.get("sDisplayName"), str(e)))
-                debug("Error traceback:")
-                debug(traceback.format_exc())
+                print("ERROR: Error traceback:", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr, flush=True)
 
     cur.close()
     conn.close()
 
-    print("Done.")
-    print(f"Successes: {successes}; Failures: {len(failures)}")
+    print("Done.", flush=True)
+    print(f"Successes: {successes}; Failures: {len(failures)}", flush=True)
     if failures:
-        print("Failures detail:")
+        print("Failures detail:", file=sys.stderr)
         for f in failures:
-            print(f)
+            print(f, file=sys.stderr, flush=True)
 
 if __name__ == "__main__":
     main()

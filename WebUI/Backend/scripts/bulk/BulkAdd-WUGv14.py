@@ -25,7 +25,7 @@ with open(CSV_PATH, newline="", encoding="utf-8-sig") as f:
     rows = list(reader)
 
 if not rows:
-    print(f"ERROR: CSV empty or headers mismatch: {CSV_PATH}")
+    print(f"ERROR: CSV empty or headers mismatch: {CSV_PATH}", file=sys.stderr)
     sys.exit(1)
 
 # SQL template
@@ -137,9 +137,9 @@ for r in rows:
             int(r["DeviceGroup"]),
         )
         conn.commit()
-        print(f"Inserted row {row_num} {r['DisplayName']}")
+        print(f"SUCCESS: Inserted row {row_num} - {r['DisplayName']}", flush=True)
     except Exception as e:
         conn.rollback()
-        print(f"WARNING: Failed row {row_num} ({r['DisplayName']}): {e}")
+        print(f"WARNING: Failed row {row_num} ({r['DisplayName']}): {e}", file=sys.stderr, flush=True)
 
 conn.close()

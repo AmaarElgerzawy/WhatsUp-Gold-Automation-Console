@@ -66,8 +66,8 @@ def run_interactive_command(conn, command, steps, context=None, max_rounds=10):
 ips = []
 
 if not ROUTER_LIST_FILE:
-    sys.stderr.write("No routers data provided\n")
-    raise SystemExit(1)
+    print("ERROR: No routers data provided", file=sys.stderr)
+    sys.exit(1)
 
 for line in ROUTER_LIST_FILE.splitlines():
     line = line.strip()
@@ -75,27 +75,27 @@ for line in ROUTER_LIST_FILE.splitlines():
         ips.append(line)
 
 if not ips:
-    sys.stderr.write(f"No router IPs found in {ROUTER_LIST_FILE}")
-    raise SystemExit(1)
+    print(f"ERROR: No router IPs found", file=sys.stderr)
+    sys.exit(1)
 
-sys.stdout.write(f"Found {len(ips)} router(s)\n")
+print(f"Found {len(ips)} router(s)")
 # ---------- LOAD TASKS (ORDERED SEQUENCE) ----------
 
 if not TASKS_FILE:
-    sys.stderr.write("No tasks data provided\n")
-    raise SystemExit(1)
+    print("ERROR: No tasks data provided", file=sys.stderr)
+    sys.exit(1)
 
 try:
     tasks = json.loads(TASKS_FILE)
 except Exception as e:
-    sys.stderr.write(f"Could not parse tasks JSON: {e}\n")
-    raise SystemExit(1)
+    print(f"ERROR: Could not parse tasks JSON: {e}", file=sys.stderr)
+    sys.exit(1)
 
 if not isinstance(tasks, list):
-    sys.stderr.write(f"{TASKS_FILE} must contain a JSON list.")
-    raise SystemExit(1)
+    print("ERROR: Tasks must contain a JSON list.", file=sys.stderr)
+    sys.exit(1)
 
-sys.stdout.write(f"Loaded {len(tasks)} task(s) from {TASKS_FILE}\n")
+print(f"Loaded {len(tasks)} task(s)")
 
 
 # ---------- CREDENTIALS ----------
@@ -104,14 +104,14 @@ password = os.environ.get("WUG_SSH_PASS")
 enable_password = os.environ.get("WUG_SSH_ENABLE", password)
 
 if not username or not password:
-    sys.stderr.write("Missing SSH credentials\n")
-    raise SystemExit(1)
+    print("ERROR: Missing SSH credentials", file=sys.stderr)
+    sys.exit(1)
 
 timestamp_global = datetime.now().strftime("%Y%m%d-%H%M%S")
 # ---------- MAIN LOOP PER ROUTER ----------
 
 for ip in ips:
-    sys.stdout.write(f"\n=== Connecting to {ip} ===\n")
+    print(f"\n=== Connecting to {ip} ===")
 
     device = {
         "device_type": "cisco_ios",   # change if needed
@@ -130,7 +130,7 @@ for ip in ips:
 
         prompt = conn.find_prompt()
         hostname = prompt.strip("#>").strip()
-        sys.stdout.write(f"Connected to {hostname} ({ip})\n")
+        print(f"Connected to {hostname} ({ip})")
 
         # Base context available to all tasks
         base_context = {
@@ -145,7 +145,7 @@ for ip in ips:
             name = task.get("name", f"task_{idx}")
 
             log_output += f"\n=== TASK {idx}: {name} (type={ttype}) ===\n"
-            sys.stdout.write(f"Running task {idx}: {name} (type={ttype}) on {hostname}\n")
+            print(f"Running task {idx}: {name} (type={ttype}) on {hostname}")
 
             if ttype == "config":
                 # commands: list of config lines
@@ -196,19 +196,19 @@ for ip in ips:
                 log_output += out + "\n"
 
             else:
-                msg = f"Unknown task type: {ttype}"
-                sys.stderr.write(msg)
+                msg = f"ERROR: Unknown task type: {ttype}"
+                print(msg, file=sys.stderr)
                 log_output += msg + "\n"
 
         conn.disconnect()
-        sys.stdout.write(log_output)
-        sys.stdout.write(f"Done with {hostname} ({ip})\n")
+        print(log_output, end="")
+        print(f"Done with {hostname} ({ip})")
 
     except Exception as e:
         err_msg = f"ERROR on {ip}: {e}"
-        sys.stderr.write(err_msg)
+        print(err_msg, file=sys.stderr)
         log_output += "\n" + err_msg + "\n"
+        print(log_output, end="")
 
     # Save log
     # log_file.write_text(log_output, encoding="utf-8")
-    sys.stdout.write(f"Log File saved")

@@ -34,20 +34,26 @@ from auth import (
 # ================= CONFIG =================
 BASEDIR = Path(__file__).resolve().parent
 
-BulkChangesBASE_DIR = BASEDIR / ".." / ".." / "Bulk Changes" / "code"
-BulkCommandsBASEDIR = BASEDIR / ".." / ".." / "Many Routers Config"
-CONFIG_BACKUP_DIR = BASEDIR / ".." / ".." / "CONFIG BACKUP"
-BACKUP_BASE_DIR = CONFIG_BACKUP_DIR / "backups"
-ROUTERS_FILE = CONFIG_BACKUP_DIR / "routers.txt"
+# Scripts directory (all scripts are now in backend/scripts/)
+SCRIPTS_DIR = BASEDIR / "scripts"
+BULK_SCRIPTS_DIR = SCRIPTS_DIR / "bulk"
+ROUTER_SCRIPTS_DIR = SCRIPTS_DIR / "routers"
+BACKUP_SCRIPTS_DIR = SCRIPTS_DIR / "backup"
+REPORTING_SCRIPTS_DIR = SCRIPTS_DIR / "reporting"
 
+# Data directories
 DATA_DIR = BASEDIR / "data"
 CONFIG_DIR = DATA_DIR / "configs"
 LOG_DIR = DATA_DIR / "logs"
+BACKUP_BASE_DIR = BACKUP_SCRIPTS_DIR / "backups"
+
+# Configuration files
+ROUTERS_FILE = BACKUP_SCRIPTS_DIR / "routers.txt"
+REPORT_SCHEDULE_FILE = REPORTING_SCRIPTS_DIR / "report_schedule.xlsx"
 
 # Ensure data directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-REPORT_SCHEDULE_FILE = BASEDIR / ".." / ".." / "Reporting" /"report_schedule.xlsx"
+BACKUP_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 for d in [
@@ -61,9 +67,9 @@ for d in [
     d.mkdir(parents=True, exist_ok=True)
 
 SCRIPTS = {
-    "add": os.path.join(BulkChangesBASE_DIR, "BulkAdd-WUGv14.py"),
-    "update": os.path.join(BulkChangesBASE_DIR, "BulkUpdate-WUGv14.py"),
-    "delete": os.path.join(BulkChangesBASE_DIR, "BulkDelete-WUGv14.py"),
+    "add": str(BULK_SCRIPTS_DIR / "BulkAdd-WUGv14.py"),
+    "update": str(BULK_SCRIPTS_DIR / "BulkUpdate-WUGv14.py"),
+    "delete": str(BULK_SCRIPTS_DIR / "BulkDelete-WUGv14.py"),
 }
 
 CSV_NAMES = {
@@ -72,11 +78,15 @@ CSV_NAMES = {
     "delete": "Delete.csv",
 }
 
-CONNECTION_STRING = (
-    "Driver={ODBC Driver 17 for SQL Server};"
-    "Server=localhost;"
-    "Database=WhatsUp;"
-    "Trusted_Connection=yes;"
+# Database connection string - can be overridden via environment variable
+CONNECTION_STRING = os.environ.get(
+    "DB_CONNECTION_STRING",
+    (
+        "Driver={ODBC Driver 17 for SQL Server};"
+        "Server=localhost;"
+        "Database=WhatsUp;"
+        "Trusted_Connection=yes;"
+    )
 )
 # =========================================
 
@@ -135,7 +145,12 @@ def save_file(path: Path, content: str):
 def sanitize_output(text: str) -> str:
     if not text:
         return ""
-    return text.replace(str(BulkCommandsBASEDIR), "[WORKDIR]")
+    # Remove sensitive paths from output
+    text = text.replace(str(ROUTER_SCRIPTS_DIR), "[WORKDIR]")
+    text = text.replace(str(BULK_SCRIPTS_DIR), "[WORKDIR]")
+    text = text.replace(str(BACKUP_SCRIPTS_DIR), "[WORKDIR]")
+    text = text.replace(str(REPORTING_SCRIPTS_DIR), "[WORKDIR]")
+    return text
 
 def save_log(name, stdout, stderr, code, log_name: str = None):
     """Save log file with optional custom name."""
@@ -245,7 +260,7 @@ def run_interactive(
     log_name: str = Form(""),
     current_user: dict = Depends(get_current_user),
 ):
-    script_path = os.path.join(BulkCommandsBASEDIR, "Interactive_Commands.py")
+    script_path = str(ROUTER_SCRIPTS_DIR / "Interactive_Commands.py")
 
     # Prepare environment for the script
     env = os.environ.copy()
@@ -258,13 +273,13 @@ def run_interactive(
     try:
         proc = subprocess.run(
             ["python", script_path],
-            cwd=BulkCommandsBASEDIR,
+            cwd=str(ROUTER_SCRIPTS_DIR),
             capture_output=True,
             text=True,
             env=env
         )
         
-        SCRIPT_LOG_DIR = Path(BulkCommandsBASEDIR) / "bulk_sequence_logs"
+        SCRIPT_LOG_DIR = ROUTER_SCRIPTS_DIR / "bulk_sequence_logs"
         collect_logs(SCRIPT_LOG_DIR, LOG_DIR)
         
         # Save config with custom name or timestamp
@@ -315,7 +330,7 @@ def run_simple(
     log_name: str = Form(""),
     current_user: dict = Depends(get_current_user),
 ):
-    script_path = os.path.join(BulkCommandsBASEDIR, "Simple_Config.py")
+    script_path = str(ROUTER_SCRIPTS_DIR / "Simple_Config.py")
 
     with tempfile.TemporaryDirectory() as tmp:
         routers_file = os.path.join(tmp, "routers.txt")
@@ -336,13 +351,13 @@ def run_simple(
 
         proc = subprocess.run(
             ["python", script_path],
-            cwd=BulkCommandsBASEDIR,
+            cwd=str(ROUTER_SCRIPTS_DIR),
             capture_output=True,
             text=True,
             env=env
         )
 
-        SCRIPT_LOG_DIR = Path(BulkCommandsBASEDIR) / "bulk_sequence_logs"
+        SCRIPT_LOG_DIR = ROUTER_SCRIPTS_DIR / "bulk_sequence_logs"
         collect_logs(SCRIPT_LOG_DIR, LOG_DIR)
         
         # Save config with custom name or timestamp
@@ -783,7 +798,12 @@ def rename_config(
         raise HTTPException(404, "File not found")
     
     old_path.rename(new_path)
-    log_activity(current_user, "Rename Config File", f"Rename Config File {name} -> {sanitized}{old_ext}", section)
+    log_activity(
+        current_user["id"],
+        "rename_config",
+        f"Renamed {section}/{name} to {sanitized}{old_ext}",
+        "history"
+    )
     return {"status": "renamed", "new_name": f"{sanitized}{old_ext}"}
 
 @app.get("/logs")
@@ -844,7 +864,12 @@ def rename_log(
         raise HTTPException(404, "File not found")
     
     old_path.rename(new_path)
-    log_activity(current_user, "Rename Config File", f"Rename Config File {name} -> {sanitized}{old_ext}", "logs")
+    log_activity(
+        current_user["id"],
+        "rename_log",
+        f"Renamed log {name} to {sanitized}{old_ext}",
+        "history"
+    )
     return {"status": "renamed", "new_name": f"{sanitized}{old_ext}"}
 
 # ================= Backup =================

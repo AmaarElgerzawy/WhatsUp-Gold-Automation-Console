@@ -30,16 +30,23 @@ A modern web-based automation platform for managing WhatsUp Gold network monitor
 
 ```
 WhatsUP Automatons/
-├── Bulk Changes/          # Bulk device add/update/delete scripts
-│   └── Code/              # Python scripts and shared config
-├── Config Backup/         # Router config backup scripts
-├── Many Routers Config/   # Router command execution scripts
-├── Reporting/             # Scheduled report generation
 ├── WebUI/
-│   ├── Backend/          # FastAPI server (main.py)
+│   ├── Backend/          # FastAPI server
+│   │   ├── scripts/      # All automation scripts
+│   │   │   ├── bulk/     # Bulk operations
+│   │   │   ├── routers/  # Router commands
+│   │   │   ├── backup/   # Config backups
+│   │   │   └── reporting/ # Report generation
+│   │   ├── data/         # Runtime data (configs, logs, backups)
+│   │   ├── main.py       # FastAPI application
+│   │   └── auth.py       # Authentication module
 │   └── Frontend/
 │       └── wug-ui/       # React application
-└── SQL Codes/            # SQL queries for database operations
+└── [Legacy directories - kept for reference]
+    ├── Bulk Changes/      # (scripts moved to WebUI/Backend/scripts/bulk/)
+    ├── Many Routers Config/ # (scripts moved to WebUI/Backend/scripts/routers/)
+    ├── Config Backup/     # (scripts moved to WebUI/Backend/scripts/backup/)
+    └── Reporting/         # (scripts moved to WebUI/Backend/scripts/reporting/)
 ```
 
 ## Prerequisites
@@ -50,9 +57,34 @@ WhatsUP Automatons/
 - ODBC Driver 17 for SQL Server
 - Network access to routers/devices
 
-## Installation
+## Quick Start with Docker (Recommended)
 
-### Backend Setup
+The easiest way to run the application is using Docker Compose:
+
+```bash
+# Copy environment file
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+The application will be available at:
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+See [DOCKER.md](DOCKER.md) for detailed Docker instructions.
+
+## Installation (Manual) Setup
 
 1. Navigate to the project root:
 
@@ -134,12 +166,17 @@ SSH credentials are stored in browser localStorage. For production, consider:
 
 ### File Paths
 
-The backend expects the following folder structure relative to the project root:
+The backend uses the following structure (all within `WebUI/Backend/`):
 
-- `Bulk Changes/Code/` - Bulk operation scripts
-- `Many Routers Config/` - Router command scripts
-- `Config Backup/backups/` - Device config backups
-- `Reporting/report_schedule.xlsx` - Report schedule configuration
+- `scripts/bulk/` - Bulk operation scripts
+- `scripts/routers/` - Router command scripts
+- `scripts/backup/` - Backup scripts and router list
+- `scripts/reporting/` - Report generation scripts and schedule
+- `data/configs/` - Saved configurations
+- `data/logs/` - Execution logs
+- `data/backups/` - Device configuration backups
+
+**Note**: The project has been reorganized for Docker compatibility. See [MIGRATION.md](MIGRATION.md) for details.
 
 ## Usage
 
@@ -204,6 +241,29 @@ The backend expects the following folder structure relative to the project root:
 
 - `GET /reports/schedule` - Get report schedule
 - `POST /reports/schedule` - Update report schedule
+
+## Docker Deployment
+
+See [DOCKER.md](DOCKER.md) for comprehensive Docker deployment instructions.
+
+### Quick Docker Commands
+
+```bash
+# Build and start
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+
+# Development mode (with hot reload)
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+# Production mode
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
 
 ## Development
 
