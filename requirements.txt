@@ -7,3 +7,4 @@ pyodbc==5.0.1
 netmiko==4.2.0
 python-jose[cryptography]==3.3.0
 bcrypt==4.1.2
+uvicorn
