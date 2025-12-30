@@ -1,0 +1,21 @@
+After install nssm and place it in system32
+
+For Backend
+
+nssm install wug-backend
+path: C:\WhatsUp-Gold-Automation-Console\.venv\Scripts\python.exe 
+statup DirECTORY: C:\WhatsUp-Gold-Automation-Console\WebUI\Backend
+Arguments: uvicorn main:app --reload --port 8000
+
+For Frontend
+mkdir C:\npm-global
+npm config -g set prefix "C:\npm-global"
+npm config get prefix
+npm install -g serve
+
+Dont't Forget to build the app "npm run build"
+
+nssm install wug-frontend
+path: C:\Program Files\nodejs\node.exe
+Working Dir statup DirECTORY: C:\WhatsUp-Gold-Automation-Console\WebUI\Frontend\wug-ui\
+Arguments: C:\npm-global\node_modules\serve\build\main.js -s build -l 3000

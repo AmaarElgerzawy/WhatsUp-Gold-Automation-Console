@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBearer
 from typing import Optional
 import pandas as pd
@@ -12,6 +12,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import shutil
 import json
+import io
 
 # Import auth module
 from auth import (
@@ -55,6 +56,7 @@ REPORT_SCHEDULE_FILE = REPORTING_SCRIPTS_DIR / "report_schedule.xlsx"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 BACKUP_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
+TEMPLATE_FILE = DATA_DIR / "bulk_templates.json"
 
 for d in [
     CONFIG_DIR / "bulk_add",
@@ -94,10 +96,11 @@ app = FastAPI(title="WhatsUp Gold WebUI Wrapper")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://api:3000", "http://wug.automation:3000"],
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
+    allow_credentials=True,
 )
 
 # Security for optional auth endpoints
@@ -161,6 +164,14 @@ def save_log(name, stdout, stderr, code, log_name: str = None):
     path = LOG_DIR / filename
     save_file(path, f"EXIT CODE: {code}\n\nSTDOUT:\n{stdout}\n\nSTDERR:\n{stderr}")
 
+def load_templates():
+    return json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
+
+def save_templates(data):
+    TEMPLATE_FILE.write_text(
+        json.dumps(data, indent=2),
+        encoding="utf-8"
+    )
 # ================= DB HELPERS =================
 def get_conn():
     return pyodbc.connect(CONNECTION_STRING)
@@ -247,6 +258,30 @@ def run_bulk(
             "stdout": clean_stdout,
             "stderr": clean_stderr,
         }
+
+@app.get("/bulk/template/{operation}")
+def download_bulk_template(operation: str):
+    templates = load_templates()
+
+    if operation not in templates:
+        raise HTTPException(404, "Unknown template")
+
+    df = pd.DataFrame(columns=templates[operation])
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Template")
+
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="bulk_{operation}_template.xlsx"'
+        },
+    )
+
 
 # ================= ROUTER Config =================
 @app.post("/routers/run-interactive")
@@ -414,7 +449,6 @@ def login(username: str = Form(...), password: str = Form(...)):
         }
     }
 
-
 @app.get("/auth/me")
 def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """Get current user information."""
@@ -425,7 +459,6 @@ def get_current_user_info(current_user: dict = Depends(get_current_user)):
         "role": current_user["role"],
         "privileges": current_user.get("privileges", []),
     }
-
 
 @app.get("/auth/check-page-access")
 def check_page_access(page: str, current_user: dict = Depends(get_current_user)):
@@ -440,7 +473,6 @@ def check_page_access(page: str, current_user: dict = Depends(get_current_user))
         "required_privilege": required_privilege,
         "user_privileges": current_user.get("privileges", []),
     }
-
 
 # ================= ADMIN ENDPOINTS =================
 @app.get("/admin/users")
@@ -461,7 +493,6 @@ def list_users(current_user: dict = Depends(require_privilege("admin_access"))):
         }
         for u in users
     ]
-
 
 @app.post("/admin/users")
 def create_user(
@@ -533,7 +564,6 @@ def create_user(
         "role": new_user["role"],
         "privileges": new_user["privileges"],
     }
-
 
 @app.put("/admin/users/{user_id}")
 def update_user(
@@ -634,7 +664,6 @@ def update_user(
         "active": user.get("active", True),
     }
 
-
 @app.delete("/admin/users/{user_id}")
 def delete_user(
     user_id: str,
@@ -668,7 +697,6 @@ def delete_user(
     
     return {"status": "deleted"}
 
-
 @app.get("/admin/activity")
 def get_activity_log(
     limit: int = 500,
@@ -701,7 +729,6 @@ def get_activity_log(
     log_activity(current_user["id"], "view_activity_log", f"Viewed {len(result)} activity log entries", "admin")
     return result
 
-
 @app.get("/admin/stats")
 def get_admin_stats(current_user: dict = Depends(require_privilege("admin_access"))):
     """Get admin statistics."""
@@ -728,7 +755,6 @@ def get_admin_stats(current_user: dict = Depends(require_privilege("admin_access
         "recent_activities_24h": recent_activities,
     }
 
-
 @app.get("/admin/privileges")
 def get_admin_privileges_list(current_user: dict = Depends(require_privilege("admin_access"))):
     """Get list of available privileges with their descriptions."""
@@ -738,6 +764,22 @@ def get_admin_privileges_list(current_user: dict = Depends(require_privilege("ad
         "page_privileges": PAGE_PRIVILEGES,
     }
 
+@app.get("/admin/bulk-templates")
+def get_bulk_templates(current_user: dict = Depends(require_privilege("admin_access"))):
+    return load_templates()
+
+@app.put("/admin/bulk-templates")
+def update_bulk_templates(
+    payload: dict,
+    current_user: dict = Depends(require_privilege("admin_access"))
+):
+    # Basic validation
+    for op, cols in payload.items():
+        if not isinstance(cols, list) or not all(isinstance(c, str) for c in cols):
+            raise HTTPException(400, f"Invalid columns for {op}")
+
+    save_templates(payload)
+    return {"status": "ok"}
 
 # ================= VIEW / DELETE =================
 @app.get("/configs/{section}")

@@ -22,6 +22,7 @@ export async function apiCall(path, options = {}) {
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: "include"
   });
 
   // If unauthorized, clear auth and redirect to login

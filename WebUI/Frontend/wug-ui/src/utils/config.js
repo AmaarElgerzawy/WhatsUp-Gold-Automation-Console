@@ -1,10 +1,6 @@
 // Centralized API configuration
-// In Docker, use service name; in development, use localhost
-const API_BASE_URL =
-  process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === "production"
-    ? "http://backend:8000"
-    : "http://localhost:8000");
+// Use api or wug.automation as the API host
+const API_BASE_URL = process.env.NODE_ENV === 'production' ? "http://api:8000" : "http://api:8000";
 
 export const API_URL = API_BASE_URL;
 

@@ -10,6 +10,7 @@ export default function Admin() {
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [availablePrivileges, setAvailablePrivileges] = useState([]);
+  const [bulkTemplates, setBulkTemplates] = useState(null);
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -147,6 +148,11 @@ export default function Admin() {
         const res = await apiCall("admin/stats");
         if (res.ok) {
           setStats(await res.json());
+        }
+      } else if (activeTab === "bulkTemplates") {
+        const res = await apiCall("admin/bulk-templates");
+        if (res.ok) {
+          setBulkTemplates(await res.json());
         }
       }
     } catch (e) {
@@ -348,6 +354,18 @@ export default function Admin() {
             onClick={() => setActiveTab("stats")}
           >
             Statistics
+          </button>
+          <button
+            type="button"
+            className={
+              "button button--sm" +
+              (activeTab === "bulkTemplates"
+                ? " button--primary"
+                : " button--ghost")
+            }
+            onClick={() => setActiveTab("bulkTemplates")}
+          >
+            Bulk Templates
           </button>
         </div>
       </div>
@@ -801,6 +819,88 @@ export default function Admin() {
               </div>
               <div className="card-subtitle">Activities (24h)</div>
             </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === "bulkTemplates" && bulkTemplates && (
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Bulk Excel Templates</h3>
+              <p className="card-subtitle">
+                Define required Excel columns for each bulk operation.
+              </p>
+            </div>
+          </div>
+
+          {Object.entries(bulkTemplates).map(([operation, columns]) => (
+            <div key={operation} style={{ marginBottom: 20 }}>
+              <h4 style={{ textTransform: "capitalize", marginBottom: 8 }}>
+                {operation} operation
+              </h4>
+
+              {columns.map((col, idx) => (
+                <div
+                  key={idx}
+                  style={{ display: "flex", gap: 8, marginBottom: 6 }}
+                >
+                  <input
+                    className="input"
+                    value={col}
+                    onChange={(e) => {
+                      const copy = { ...bulkTemplates };
+                      copy[operation][idx] = e.target.value;
+                      setBulkTemplates(copy);
+                    }}
+                  />
+                  <button
+                    className="button button--danger button--sm"
+                    type="button"
+                    onClick={() => {
+                      const copy = { ...bulkTemplates };
+                      copy[operation].splice(idx, 1);
+                      setBulkTemplates(copy);
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
+              <button
+                className="button button--ghost button--sm"
+                type="button"
+                onClick={() => {
+                  const copy = { ...bulkTemplates };
+                  copy[operation].push("NewColumn");
+                  setBulkTemplates(copy);
+                }}
+              >
+                + Add column
+              </button>
+            </div>
+          ))}
+
+          <div style={{ marginTop: 16 }}>
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={async () => {
+                const res = await apiCall("admin/bulk-templates", {
+                  method: "PUT",
+                  body: JSON.stringify(bulkTemplates),
+                });
+
+                if (res.ok) {
+                  alert("Templates saved successfully");
+                } else {
+                  alert("Failed to save templates");
+                }
+              }}
+            >
+              💾 Save templates
+            </button>
           </div>
         </section>
       )}

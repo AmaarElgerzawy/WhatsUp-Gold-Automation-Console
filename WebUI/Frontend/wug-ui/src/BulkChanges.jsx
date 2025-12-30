@@ -10,6 +10,35 @@ function BulkChnages() {
   const [configName, setConfigName] = useState("");
   const [logName, setLogName] = useState("");
 
+  const downloadTemplate = async () => {
+    try {
+      const res = await apiCall(`bulk/template/${operation}`, {
+        method: "GET",
+      });
+
+      if (!res.ok) {
+        alert("Failed to download template");
+        return;
+      }
+
+      const blob = await res.blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = `bulk_${operation}_template.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Error downloading template");
+    }
+  };
+
   const run = async () => {
     if (!file) {
       alert("Select an Excel file");
@@ -73,8 +102,13 @@ function BulkChnages() {
             </p>
           </div>
           <div className="card-actions">
-            <button className="button button--ghost button--sm" type="button">
-              <span className="button-icon">📄</span>Template
+            <button
+              className="button button--ghost button--sm"
+              type="button"
+              onClick={downloadTemplate}
+            >
+              <span className="button-icon">📄</span>
+              Download template
             </button>
           </div>
         </div>
