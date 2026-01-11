@@ -11,10 +11,13 @@ DEFAULT_BEST_STATE_ID = 1
 TEMP_DEFAULT_NETIF_ID = 0   # Change if your DB forbids 0
 
 CONNECTION_STRING = (
-    "Driver={ODBC Driver 17 for SQL Server};"
+    "Driver={ODBC Driver 18 for SQL Server};"
     "Server=localhost;"
     "Database=WhatsUp;"
-    "Trusted_Connection=yes;"
+    "UID=maxor;"
+    "PWD=MAXOR321;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=yes;"
 )
 # ------------------------
 
@@ -31,8 +34,6 @@ if not rows:
 # SQL template
 sql_template = """
 SET NOCOUNT ON;
-BEGIN TRY
-    BEGIN TRAN;
 
     INSERT INTO Device (
         sDisplayName, nDeviceTypeID, nDeviceMenuSetID, nDeviceWebMenuSetID,
@@ -94,7 +95,7 @@ BEGIN TRY
     )
     VALUES (
         @NewDeviceID, 2, @NewNetworkInterfaceID,
-        0, 41, GETDATE(),
+        0, 0, GETDATE(),
         @NewActionPolicyID, NULL,
         NULL, 0,
         0, 0, '', '', NULL
@@ -103,12 +104,6 @@ BEGIN TRY
     INSERT INTO PivotDeviceToGroup (nDeviceID, nDeviceGroupID)
         VALUES (@NewDeviceID, ?);
 
-    COMMIT TRAN;
-END TRY
-BEGIN CATCH
-    IF XACT_STATE() <> 0 ROLLBACK TRAN;
-    THROW;
-END CATCH;
 """
 
 sql = sql_template.format(

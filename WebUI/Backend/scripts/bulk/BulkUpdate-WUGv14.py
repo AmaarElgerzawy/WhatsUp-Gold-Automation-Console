@@ -1,7 +1,15 @@
 import csv, sys, pyodbc, traceback
 
 # ----------------- CONFIG --------------------
-CONNECTION_STRING = r"Driver={ODBC Driver 17 for SQL Server};Server=localhost;Database=WhatsUp;Trusted_Connection=yes;"
+CONNECTION_STRING = (
+    "Driver={ODBC Driver 18 for SQL Server};"
+    "Server=localhost;"
+    "Database=WhatsUp;"
+    "UID=maxor;"
+    "PWD=MAXOR321;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=yes;"
+)
 
 CSV_PATH = sys.argv[1]
 # ---------------------------------------------

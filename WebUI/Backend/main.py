@@ -81,14 +81,14 @@ CSV_NAMES = {
 }
 
 # Database connection string - can be overridden via environment variable
-CONNECTION_STRING = os.environ.get(
-    "DB_CONNECTION_STRING",
-    (
-        "Driver={ODBC Driver 17 for SQL Server};"
-        "Server=localhost;"
-        "Database=WhatsUp;"
-        "Trusted_Connection=yes;"
-    )
+CONNECTION_STRING = (
+    "Driver={ODBC Driver 18 for SQL Server};"
+    "Server=localhost;"
+    "Database=WhatsUp;"
+    "UID=maxor;"
+    "PWD=MAXOR321;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=yes;"
 )
 # =========================================
 
