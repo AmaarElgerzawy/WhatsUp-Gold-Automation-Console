@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { setToken, setUser } from "./utils/auth";
 import { apiUrl } from "./utils/config";
+import {
+  ENDPOINTS,
+  FORM_FIELDS,
+  COLORS,
+  SPACING,
+  STATUS_MESSAGES,
+  ERROR_MESSAGES,
+  UI_LABELS,
+  CONTENT_TYPES,
+} from "./utils/constants";
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -15,7 +25,7 @@ export default function Login({ onLogin }) {
 
     // Validate inputs
     if (!username.trim() || !password.trim()) {
-      setError("Please enter both username and password");
+      setError(ERROR_MESSAGES.NO_USERNAME_PASSWORD);
       setLoading(false);
       return;
     }
@@ -24,13 +34,13 @@ export default function Login({ onLogin }) {
       // Use URLSearchParams instead of FormData for simple form fields
       // FastAPI Form() accepts both multipart/form-data and application/x-www-form-urlencoded
       const formData = new URLSearchParams();
-      formData.append("username", username.trim());
-      formData.append("password", password);
+      formData.append(FORM_FIELDS.USERNAME, username.trim());
+      formData.append(FORM_FIELDS.PASSWORD, password);
 
-      const res = await fetch(apiUrl("auth/login"), {
+      const res = await fetch(apiUrl(ENDPOINTS.AUTH_LOGIN), {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": CONTENT_TYPES.FORM_URLENCODED,
         },
         body: formData.toString(),
       });
@@ -51,7 +61,7 @@ export default function Login({ onLogin }) {
       }
 
       if (!res.ok) {
-        setError(data.detail || "Login failed");
+        setError(data.detail || ERROR_MESSAGES.LOGIN_FAILED);
         setLoading(false);
         return;
       }
@@ -62,7 +72,7 @@ export default function Login({ onLogin }) {
     } catch (e) {
       console.error("Login error:", e);
       setError(
-        `Network error: ${e.message}. Please check if the backend is running.`
+        `${ERROR_MESSAGES.NETWORK_ERROR}: ${e.message}. Please check if the backend is running.`
       );
       setLoading(false);
     }
@@ -75,15 +85,15 @@ export default function Login({ onLogin }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "radial-gradient(circle at top, #1f2937 0, #020617 55%)",
-        padding: 20,
+        background: `radial-gradient(circle at top, ${COLORS.BG_GRADIENT_START} 0, ${COLORS.BG_GRADIENT_END} 55%)`,
+        padding: SPACING.MD,
       }}
     >
       <div className="card" style={{ maxWidth: 400, width: "100%" }}>
         <div className="card-header">
           <div>
-            <h2 className="card-title">WhatsUp Automation Console</h2>
-            <p className="card-subtitle">Please sign in to continue</p>
+            <h2 className="card-title">{UI_LABELS.CONSOLE_TITLE}</h2>
+            <p className="card-subtitle">{UI_LABELS.SIGN_IN_TO_CONTINUE}</p>
           </div>
         </div>
 
@@ -118,27 +128,29 @@ export default function Login({ onLogin }) {
           {error && (
             <div
               style={{
-                padding: 12,
+                padding: SPACING.MD,
                 borderRadius: 8,
-                background: "rgba(248, 113, 113, 0.1)",
-                border: "1px solid rgba(248, 113, 113, 0.5)",
-                color: "#fecaca",
+                background: COLORS.ERROR_BG,
+                border: `1px solid ${COLORS.ERROR_BORDER}`,
+                color: COLORS.ERROR_TEXT,
                 fontSize: 13,
-                marginBottom: 16,
+                marginBottom: SPACING.LG,
               }}
             >
               {error}
             </div>
           )}
 
-          <div style={{ marginTop: 20 }}>
+          <div style={{ marginTop: SPACING.LG }}>
             <button
               type="submit"
               className="button button--primary"
               disabled={loading}
               style={{ width: "100%" }}
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading
+                ? STATUS_MESSAGES.SIGNING_IN_LABEL
+                : STATUS_MESSAGES.SIGN_IN_LABEL}
             </button>
           </div>
         </form>

@@ -1,8 +1,17 @@
 import { useState } from "react";
 import { apiCall } from "./utils/api";
+import {
+  ENDPOINTS,
+  OPERATIONS,
+  FORM_FIELDS,
+  UI_LABELS,
+  ICONS,
+  ERROR_MESSAGES,
+  SPACING,
+} from "./utils/constants";
 
 function BulkChnages() {
-  const [operation, setOperation] = useState("add");
+  const [operation, setOperation] = useState(OPERATIONS.ADD);
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState("");
@@ -12,12 +21,12 @@ function BulkChnages() {
 
   const downloadTemplate = async () => {
     try {
-      const res = await apiCall(`bulk/template/${operation}`, {
+      const res = await apiCall(`${ENDPOINTS.BULK_TEMPLATE}/${operation}`, {
         method: "GET",
       });
 
       if (!res.ok) {
-        alert("Failed to download template");
+        alert(ERROR_MESSAGES.TEMPLATE_DOWNLOAD_FAILED);
         return;
       }
 
@@ -35,13 +44,13 @@ function BulkChnages() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      alert("Error downloading template");
+      alert(ERROR_MESSAGES.TEMPLATE_DOWNLOAD_ERROR);
     }
   };
 
   const run = async () => {
     if (!file) {
-      alert("Select an Excel file");
+      alert(ERROR_MESSAGES.NO_FILE_SELECTED);
       return;
     }
 
@@ -50,13 +59,13 @@ function BulkChnages() {
     setError("");
 
     const formData = new FormData();
-    formData.append("operation", operation);
-    formData.append("file", file);
-    formData.append("config_name", configName.trim());
-    formData.append("log_name", logName.trim());
+    formData.append(FORM_FIELDS.OPERATION, operation);
+    formData.append(FORM_FIELDS.FILE, file);
+    formData.append(FORM_FIELDS.CONFIG_NAME, configName.trim());
+    formData.append(FORM_FIELDS.LOG_NAME, logName.trim());
 
     try {
-      const res = await apiCall("run", {
+      const res = await apiCall(ENDPOINTS.RUN_BULK, {
         method: "POST",
         body: formData,
       });
@@ -85,18 +94,18 @@ function BulkChnages() {
     <>
       <div className="app-main-header">
         <div>
-          <h2 className="app-main-title">Bulk device operations</h2>
+          <h2 className="app-main-title">{UI_LABELS.BULK}</h2>
           <p className="app-main-subtitle">
             Import an Excel sheet and safely apply large‑scale changes.
           </p>
         </div>
-        <span className="pill">Excel driven</span>
+        <span className="pill">{UI_LABELS.EXCEL_DRIVEN}</span>
       </div>
 
       <section className="card">
         <div className="card-header">
           <div>
-            <h3 className="card-title">Upload & run</h3>
+            <h3 className="card-title">{UI_LABELS.UPLOAD_AND_RUN}</h3>
             <p className="card-subtitle">
               Select the action and the Excel file that contains your devices.
             </p>
@@ -107,23 +116,23 @@ function BulkChnages() {
               type="button"
               onClick={downloadTemplate}
             >
-              <span className="button-icon">📄</span>
-              Download template
+              <span className="button-icon">{ICONS.DOCUMENT}</span>
+              {UI_LABELS.DOWNLOAD_TEMPLATE}
             </button>
           </div>
         </div>
 
         <div className="form-grid">
           <div className="form-group">
-            <label className="form-label">Operation</label>
+            <label className="form-label">{UI_LABELS.OPERATION}</label>
             <select
               className="select"
               value={operation}
               onChange={(e) => setOperation(e.target.value)}
             >
-              <option value="add">Add devices</option>
-              <option value="delete">Delete devices</option>
-              <option value="update">Update devices</option>
+              <option value={OPERATIONS.ADD}>Add devices</option>
+              <option value={OPERATIONS.DELETE}>Delete devices</option>
+              <option value={OPERATIONS.UPDATE}>Update devices</option>
             </select>
             <span className="helper-text">
               Choose what you want to do with the devices listed in the Excel
@@ -132,7 +141,7 @@ function BulkChnages() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Excel file (.xlsx)</label>
+            <label className="form-label">{UI_LABELS.FILE}</label>
             <input
               className="input"
               type="file"
@@ -145,9 +154,9 @@ function BulkChnages() {
           </div>
         </div>
 
-        <div className="form-grid" style={{ marginTop: 18 }}>
+        <div className="form-grid" style={{ marginTop: SPACING.MD }}>
           <div className="form-group">
-            <label className="form-label">Config name (optional)</label>
+            <label className="form-label">{UI_LABELS.CONFIG_NAME}</label>
             <input
               className="input"
               placeholder="Leave blank for auto-generated name"
@@ -160,7 +169,7 @@ function BulkChnages() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Log name (optional)</label>
+            <label className="form-label">{UI_LABELS.LOG_NAME}</label>
             <input
               className="input"
               placeholder="Leave blank for auto-generated name"
@@ -173,7 +182,9 @@ function BulkChnages() {
           </div>
         </div>
 
-        <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
+        <div
+          style={{ marginTop: SPACING.LG, display: "flex", gap: SPACING.SM }}
+        >
           <button
             className="button button--primary"
             onClick={run}

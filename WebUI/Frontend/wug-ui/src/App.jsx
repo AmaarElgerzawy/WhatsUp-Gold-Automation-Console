@@ -11,6 +11,13 @@ import Login from "./Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ManualReports from "./ManualReports";
 import { checkAuth, logout as authLogout, getUser } from "./utils/auth";
+import {
+  PAGE_PRIVILEGE_MAP,
+  PRIVILEGES,
+  COLORS,
+  STATUS_MESSAGES,
+  SPACING,
+} from "./utils/constants";
 
 export default function App() {
   const [page, setPage] = useState("bulk");
@@ -31,22 +38,11 @@ export default function App() {
   useEffect(() => {
     if (!user || !user.privileges || !Array.isArray(user.privileges)) return;
 
-    const pagePrivilegeMap = {
-      bulk: "bulk_operations",
-      routers: "router_commands",
-      history: "view_history",
-      backups: "view_backups",
-      reports: "manage_reports",
-      generatereports: "manage_reports",
-      credentials: "manage_credentials",
-      admin: "admin_access",
-    };
-
-    const requiredPrivilege = pagePrivilegeMap[page];
+    const requiredPrivilege = PAGE_PRIVILEGE_MAP[page];
     if (requiredPrivilege && !user.privileges.includes(requiredPrivilege)) {
       // Find first available page
-      const availablePage = Object.keys(pagePrivilegeMap).find((p) =>
-        user.privileges.includes(pagePrivilegeMap[p])
+      const availablePage = Object.keys(PAGE_PRIVILEGE_MAP).find((p) =>
+        user.privileges.includes(PAGE_PRIVILEGE_MAP[p])
       );
       if (availablePage) {
         setPage(availablePage);
@@ -72,10 +68,10 @@ export default function App() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "radial-gradient(circle at top, #1f2937 0, #020617 55%)",
+          background: `radial-gradient(circle at top, ${COLORS.BG_GRADIENT_START} 0, ${COLORS.BG_GRADIENT_END} 55%)`,
         }}
       >
-        <p className="card-subtitle">Loading...</p>
+        <p className="card-subtitle">{STATUS_MESSAGES.LOADING}</p>
       </div>
     );
   }
@@ -116,7 +112,7 @@ export default function App() {
         <nav className="app-nav">
           {user.privileges &&
             Array.isArray(user.privileges) &&
-            user.privileges.includes("bulk_operations") && (
+            user.privileges.includes(PRIVILEGES.BULK_OPERATIONS) && (
               <div className="app-nav-group">
                 <div className="app-nav-section-label">Bulk operations</div>
                 <button
@@ -139,7 +135,7 @@ export default function App() {
 
           {user.privileges &&
             Array.isArray(user.privileges) &&
-            user.privileges.includes("router_commands") && (
+            user.privileges.includes(PRIVILEGES.ROUTER_COMMANDS) && (
               <div className="app-nav-group">
                 <div className="app-nav-section-label">Routers</div>
                 <button
@@ -162,7 +158,7 @@ export default function App() {
 
           {user.privileges &&
             Array.isArray(user.privileges) &&
-            user.privileges.includes("view_history") && (
+            user.privileges.includes(PRIVILEGES.VIEW_HISTORY) && (
               <div className="app-nav-group">
                 <div className="app-nav-section-label">History</div>
                 <button
@@ -187,7 +183,7 @@ export default function App() {
             <div className="app-nav-section-label">Backups & reports</div>
             {user.privileges &&
               Array.isArray(user.privileges) &&
-              user.privileges.includes("view_backups") && (
+              user.privileges.includes(PRIVILEGES.VIEW_BACKUPS) && (
                 <button
                   className={
                     "nav-button" +
@@ -207,7 +203,7 @@ export default function App() {
 
             {user.privileges &&
               Array.isArray(user.privileges) &&
-              user.privileges.includes("manage_reports") && (
+              user.privileges.includes(PRIVILEGES.MANAGE_REPORTS) && (
                 <button
                   className={
                     "nav-button" +
@@ -227,7 +223,7 @@ export default function App() {
 
             {user.privileges &&
               Array.isArray(user.privileges) &&
-              user.privileges.includes("manage_reports") && (
+              user.privileges.includes(PRIVILEGES.MANAGE_REPORTS) && (
                 <button
                   className={
                     "nav-button" +
@@ -248,7 +244,7 @@ export default function App() {
 
           {user.privileges &&
             Array.isArray(user.privileges) &&
-            user.privileges.includes("manage_credentials") && (
+            user.privileges.includes(PRIVILEGES.MANAGE_CREDENTIALS) && (
               <div className="app-nav-group">
                 <div className="app-nav-section-label">Settings</div>
                 <button
@@ -271,7 +267,7 @@ export default function App() {
 
           {user.privileges &&
             Array.isArray(user.privileges) &&
-            user.privileges.includes("admin_access") && (
+            user.privileges.includes(PRIVILEGES.ADMIN_ACCESS) && (
               <div className="app-nav-group">
                 <div className="app-nav-section-label">Administration</div>
                 <button

@@ -29,73 +29,86 @@ from auth import (
     PAGE_PRIVILEGES,
     ROLE_PRIVILEGES,
     AVAILABLE_PRIVILEGES,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-) 
-from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group  # ================= CONFIG =================
-BASEDIR = Path(__file__).resolve().parent
+)
 
-# Scripts directory (all scripts are now in backend/scripts/)
-SCRIPTS_DIR = BASEDIR / "scripts"
-BULK_SCRIPTS_DIR = SCRIPTS_DIR / "bulk"
-ROUTER_SCRIPTS_DIR = SCRIPTS_DIR / "routers"
-BACKUP_SCRIPTS_DIR = SCRIPTS_DIR / "backup"
-REPORTING_SCRIPTS_DIR = SCRIPTS_DIR / "reporting"
+# Import constants
+from constants import (
+    ALLOWED_ORIGINS,
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
+    BASEDIR,
+    SCRIPTS_DIR,
+    BULK_SCRIPTS_DIR,
+    ROUTER_SCRIPTS_DIR,
+    BACKUP_SCRIPTS_DIR,
+    REPORTING_SCRIPTS_DIR,
+    DATA_DIR,
+    CONFIG_DIR,
+    LOG_DIR,
+    BACKUP_BASE_DIR,
+    CONFIG_BULK_ADD_DIR,
+    CONFIG_BULK_UPDATE_DIR,
+    CONFIG_BULK_DELETE_DIR,
+    CONFIG_ROUTER_SIMPLE_DIR,
+    CONFIG_ROUTER_INTERACTIVE_DIR,
+    TEMPLATE_FILE,
+    ROUTERS_FILE,
+    REPORT_SCHEDULE_FILE,
+    SCRIPTS,
+    CSV_NAMES,
+    CONNECTION_STRING,
+    ENV_WUG_ROUTERS,
+    ENV_WUG_TASKS,
+    ENV_WUG_SSH_USER,
+    ENV_WUG_SSH_PASS,
+    ENV_WUG_SSH_ENABLE,
+    CONTENT_TYPE_JSON,
+    CONTENT_TYPE_FORM_URLENCODED,
+    MEDIA_TYPE_EXCEL,
+    DEFAULT_ENCODING,
+    ENCODING_UTF8_SIG,
+    QUERY_DEVICE_TYPES,
+    QUERY_DEVICE_GROUPS,
+    ERROR_INVALID_OPERATION,
+    ERROR_UNKNOWN_TEMPLATE,
+    LOG_FILE_PREFIX_BULK,
+    LOG_FILE_PREFIX_INTERACTIVE,
+    LOG_FILE_PREFIX_SIMPLE,
+    ACTIVITY_BULK_OPERATION,
+    ACTIVITY_INTERACTIVE_COMMANDS,
+    ACTIVITY_INTERACTIVE_COMMANDS_ERROR,
+    ACTIVITY_SIMPLE_COMMANDS,
+    ACTIVITY_SIMPLE_COMMANDS_ERROR,
+    CONFIG_PREFIX_BULK,
+    CONFIG_PREFIX_INTERACTIVE,
+    CONFIG_PREFIX_SIMPLE,
+    WORKDIR_PLACEHOLDER,
+    LOG_PREFIX_EXIT_CODE,
+    LOG_PREFIX_STDOUT,
+    LOG_PREFIX_STDERR,
+)
 
-# Data directories
-DATA_DIR = BASEDIR / "data"
-CONFIG_DIR = DATA_DIR / "configs"
-LOG_DIR = DATA_DIR / "logs"
-BACKUP_BASE_DIR = BACKUP_SCRIPTS_DIR / "backups"
+from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group
 
-# Configuration files
-ROUTERS_FILE = BACKUP_SCRIPTS_DIR / "routers.txt"
-REPORT_SCHEDULE_FILE = REPORTING_SCRIPTS_DIR / "report_schedule.xlsx"
-
+# ================= INITIALIZATION =================
 # Ensure data directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 BACKUP_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-TEMPLATE_FILE = DATA_DIR / "bulk_templates.json"
-
 for d in [
-    CONFIG_DIR / "bulk_add",
-    CONFIG_DIR / "bulk_update",
-    CONFIG_DIR / "bulk_delete",
-    CONFIG_DIR / "router_simple",
-    CONFIG_DIR / "router_interactive",
+    CONFIG_BULK_ADD_DIR,
+    CONFIG_BULK_UPDATE_DIR,
+    CONFIG_BULK_DELETE_DIR,
+    CONFIG_ROUTER_SIMPLE_DIR,
+    CONFIG_ROUTER_INTERACTIVE_DIR,
     LOG_DIR,
 ]:
     d.mkdir(parents=True, exist_ok=True)
-
-SCRIPTS = {
-    "add": str(BULK_SCRIPTS_DIR / "BulkAdd-WUGv14.py"),
-    "update": str(BULK_SCRIPTS_DIR / "BulkUpdate-WUGv14.py"),
-    "delete": str(BULK_SCRIPTS_DIR / "BulkDelete-WUGv14.py"),
-}
-
-CSV_NAMES = {
-    "add": "Add.csv",
-    "update": "Update.csv",
-    "delete": "Delete.csv",
-}
-
-# Database connection string - can be overridden via environment variable
-CONNECTION_STRING = (
-    "Driver={ODBC Driver 18 for SQL Server};"
-    "Server=localhost;"
-    "Database=WhatsUp;"
-    "UID=maxor;"
-    "PWD=MAXOR321;"
-    "Encrypt=yes;"
-    "TrustServerCertificate=yes;"
-)
-# =========================================
 
 app = FastAPI(title="WhatsUp Gold WebUI Wrapper")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://api:3000", "http://wug.automation:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
@@ -104,6 +117,7 @@ app.add_middleware(
 
 # Security for optional auth endpoints
 security = HTTPBearer(auto_error=False)
+
 # ================= HELPERS =================
 def collect_logs(src_dir: Path, dest_dir: Path):
     if not src_dir.exists():
@@ -141,17 +155,17 @@ def generate_filename(base_name: str, extension: str, custom_name: str = None) -
     return f"{timestamp()}.{extension}"
 
 def save_file(path: Path, content: str):
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding=DEFAULT_ENCODING) as f:
         f.write(content)
 
 def sanitize_output(text: str) -> str:
     if not text:
         return ""
     # Remove sensitive paths from output
-    text = text.replace(str(ROUTER_SCRIPTS_DIR), "[WORKDIR]")
-    text = text.replace(str(BULK_SCRIPTS_DIR), "[WORKDIR]")
-    text = text.replace(str(BACKUP_SCRIPTS_DIR), "[WORKDIR]")
-    text = text.replace(str(REPORTING_SCRIPTS_DIR), "[WORKDIR]")
+    text = text.replace(str(ROUTER_SCRIPTS_DIR), WORKDIR_PLACEHOLDER)
+    text = text.replace(str(BULK_SCRIPTS_DIR), WORKDIR_PLACEHOLDER)
+    text = text.replace(str(BACKUP_SCRIPTS_DIR), WORKDIR_PLACEHOLDER)
+    text = text.replace(str(REPORTING_SCRIPTS_DIR), WORKDIR_PLACEHOLDER)
     return text
 
 def save_log(name, stdout, stderr, code, log_name: str = None):
@@ -161,15 +175,15 @@ def save_log(name, stdout, stderr, code, log_name: str = None):
     else:
         filename = f"{timestamp()}_{name}.log"
     path = LOG_DIR / filename
-    save_file(path, f"EXIT CODE: {code}\n\nSTDOUT:\n{stdout}\n\nSTDERR:\n{stderr}")
+    save_file(path, f"{LOG_PREFIX_EXIT_CODE} {code}\n\n{LOG_PREFIX_STDOUT}\n{stdout}\n\n{LOG_PREFIX_STDERR}\n{stderr}")
 
 def load_templates():
-    return json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
+    return json.loads(TEMPLATE_FILE.read_text(encoding=DEFAULT_ENCODING))
 
 def save_templates(data):
     TEMPLATE_FILE.write_text(
         json.dumps(data, indent=2),
-        encoding="utf-8"
+        encoding=DEFAULT_ENCODING
     )
 # ================= DB HELPERS =================
 def get_conn():
@@ -178,7 +192,7 @@ def get_conn():
 def load_device_types():
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT nDeviceTypeID, sDisplayName FROM DeviceType")
+    cur.execute(QUERY_DEVICE_TYPES)
     data = {r.sDisplayName.strip(): r.nDeviceTypeID for r in cur.fetchall()}
     conn.close()
     return data
@@ -186,7 +200,7 @@ def load_device_types():
 def load_device_groups():
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT nDeviceGroupID, sGroupName FROM DeviceGroup")
+    cur.execute(QUERY_DEVICE_GROUPS)
     data = {r.sGroupName.strip(): r.nDeviceGroupID for r in cur.fetchall()}
     conn.close()
     return data
@@ -201,7 +215,7 @@ def run_bulk(
     current_user: dict = Depends(get_current_user),
 ):
     if operation not in SCRIPTS:
-        raise HTTPException(400, "Invalid operation")
+        raise HTTPException(400, ERROR_INVALID_OPERATION)
 
     df = pd.read_excel(file.file)
     device_types = load_device_types()
@@ -226,12 +240,12 @@ def run_bulk(
 
     with tempfile.TemporaryDirectory() as tmp:
         csv_path = Path(tmp) / CSV_NAMES[operation]
-        df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+        df.to_csv(csv_path, index=False, encoding=ENCODING_UTF8_SIG)
 
         # SAVE CONFIG with custom name or timestamp
-        config_filename = generate_filename("bulk_config", "csv", config_name)
+        config_filename = generate_filename(CONFIG_PREFIX_BULK, "csv", config_name)
         saved_cfg = CONFIG_DIR / f"bulk_{operation}" / config_filename
-        df.to_csv(saved_cfg, index=False, encoding="utf-8-sig")
+        df.to_csv(saved_cfg, index=False, encoding=ENCODING_UTF8_SIG)
 
         proc = subprocess.run(
             ["python", SCRIPTS[operation], str(csv_path)],
@@ -247,7 +261,7 @@ def run_bulk(
         # Log activity
         log_activity(
             current_user["id"],
-            "bulk_operation",
+            ACTIVITY_BULK_OPERATION,
             f"Executed {operation} operation with {len(df)} devices",
             "bulk"
         )
@@ -263,24 +277,22 @@ def download_bulk_template(operation: str):
     templates = load_templates()
 
     if operation not in templates:
-        raise HTTPException(404, "Unknown template")
+        raise HTTPException(404, ERROR_UNKNOWN_TEMPLATE)
 
     df = pd.DataFrame(columns=templates[operation])
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template")
-
     buffer.seek(0)
 
     return StreamingResponse(
         buffer,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=MEDIA_TYPE_EXCEL,
         headers={
             "Content-Disposition": f'attachment; filename="bulk_{operation}_template.xlsx"'
         },
     )
-
 
 # ================= ROUTER Config =================
 @app.post("/routers/run-interactive")
@@ -298,11 +310,11 @@ def run_interactive(
 
     # Prepare environment for the script
     env = os.environ.copy()
-    env["WUG_ROUTERS"] = routers
-    env["WUG_TASKS"] = tasks_json
-    env["WUG_SSH_USER"] = username
-    env["WUG_SSH_PASS"] = password
-    env["WUG_SSH_ENABLE"] = enable_password or password
+    env[ENV_WUG_ROUTERS] = routers
+    env[ENV_WUG_TASKS] = tasks_json
+    env[ENV_WUG_SSH_USER] = username
+    env[ENV_WUG_SSH_PASS] = password
+    env[ENV_WUG_SSH_ENABLE] = enable_password or password
 
     try:
         proc = subprocess.run(
@@ -317,19 +329,19 @@ def run_interactive(
         collect_logs(SCRIPT_LOG_DIR, LOG_DIR)
         
         # Save config with custom name or timestamp
-        config_filename = generate_filename("interactive_config", "txt", config_name)
-        saved_cfg = CONFIG_DIR / "router_interactive" / config_filename
+        config_filename = generate_filename(CONFIG_PREFIX_INTERACTIVE, "txt", config_name)
+        saved_cfg = CONFIG_ROUTER_INTERACTIVE_DIR / config_filename
         with open(saved_cfg, 'w') as file:
             json.dump(tasks_json, file, indent=2)
         
         # Save log with custom name or timestamp
-        save_log("interactive_commands", proc.stdout, proc.stderr, proc.returncode, log_name)
+        save_log(LOG_FILE_PREFIX_INTERACTIVE, proc.stdout, proc.stderr, proc.returncode, log_name)
         
         # Log activity
         router_count = len([r for r in routers.splitlines() if r.strip()])
         log_activity(
             current_user["id"],
-            "interactive_commands",
+            ACTIVITY_INTERACTIVE_COMMANDS,
             f"Ran Tasks on {router_count} router(s)",
             "routers"
         )
@@ -343,7 +355,7 @@ def run_interactive(
     except Exception as e:
         log_activity(
             current_user["id"],
-            "interactive_commands_error",
+            ACTIVITY_INTERACTIVE_COMMANDS_ERROR,
             f"Error: {str(e)}",
             "routers"
         )
@@ -370,10 +382,10 @@ def run_simple(
         routers_file = os.path.join(tmp, "routers.txt")
         config_file = os.path.join(tmp, "config.txt")
 
-        with open(routers_file, "w", encoding="utf-8") as f:
+        with open(routers_file, "w", encoding=DEFAULT_ENCODING) as f:
             f.write(routers)
 
-        with open(config_file, "w", encoding="utf-8") as f:
+        with open(config_file, "w", encoding=DEFAULT_ENCODING) as f:
             f.write(config)
 
         env = os.environ.copy()
@@ -395,18 +407,18 @@ def run_simple(
         collect_logs(SCRIPT_LOG_DIR, LOG_DIR)
         
         # Save config with custom name or timestamp
-        config_filename = generate_filename("simple_config", "txt", config_name)
-        saved_cfg = CONFIG_DIR / "router_simple" / config_filename
+        config_filename = generate_filename(CONFIG_PREFIX_SIMPLE, "txt", config_name)
+        saved_cfg = CONFIG_ROUTER_SIMPLE_DIR / config_filename
         shutil.copy(config_file, saved_cfg)
 
         # Save log with custom name or timestamp
-        save_log("simple_commands", proc.stdout, proc.stderr, proc.returncode, log_name)
+        save_log(LOG_FILE_PREFIX_SIMPLE, proc.stdout, proc.stderr, proc.returncode, log_name)
         
         # Log activity
         router_count = len([r for r in routers.splitlines() if r.strip()])
         log_activity(
             current_user["id"],
-            "simple_commands",
+            ACTIVITY_SIMPLE_COMMANDS,
             f"Ran simple config on {router_count} router(s)",
             "routers"
         )
@@ -428,7 +440,7 @@ def login(username: str = Form(...), password: str = Form(...)):
             detail="Incorrect username or password"
         )
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["id"]}, expires_delta=access_token_expires
     )

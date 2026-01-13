@@ -8,63 +8,21 @@ from pathlib import Path
 import json
 import os
 
-# JWT Configuration
-SECRET_KEY = os.environ.get("WUG_JWT_SECRET", "your-secret-key-change-in-production-min-32-chars")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+# Import constants
+from constants import (
+    JWT_SECRET_KEY,
+    JWT_ALGORITHM,
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
+    USERS_FILE,
+    ACTIVITY_LOG_FILE,
+    PAGE_PRIVILEGES,
+    ROLE_PRIVILEGES,
+    AVAILABLE_PRIVILEGES,
+    DEFAULT_ENCODING,
+)
 
 # Password hashing - using bcrypt directly for better compatibility
 security = HTTPBearer()
-
-# User storage
-USERS_FILE = Path(__file__).parent / "data" / "users.json"
-ACTIVITY_LOG_FILE = Path(__file__).parent / "data" / "activity_log.json"
-
-# Privileges/Pages mapping
-PAGE_PRIVILEGES = {
-    "bulk": "bulk_operations",
-    "routers": "router_commands",
-    "history": "view_history",
-    "backups": "view_backups",
-    "reports": "manage_reports",
-    "generatereports": "manage_reports",
-    "credentials": "manage_credentials",
-    "admin": "admin_access",
-}
-
-# Default privileges for roles
-ROLE_PRIVILEGES = {
-    "admin": [
-        "bulk_operations",
-        "router_commands",
-        "view_history",
-        "view_backups",
-        "manage_reports",
-        "manage_credentials",
-        "admin_access",
-    ],
-    "operator": [
-        "bulk_operations",
-        "router_commands",
-        "view_history",
-        "view_backups",
-    ],
-    "viewer": [
-        "view_history",
-        "view_backups",
-    ],
-}
-
-# Available privileges list (for admin UI)
-AVAILABLE_PRIVILEGES = [
-    {"id": "bulk_operations", "name": "Bulk Operations", "description": "Execute bulk device add/update/delete operations"},
-    {"id": "router_commands", "name": "Router Commands", "description": "Execute simple and interactive router commands"},
-    {"id": "view_history", "name": "View History", "description": "View saved configs and execution logs"},
-    {"id": "view_backups", "name": "View Backups", "description": "View configuration backups"},
-    {"id": "manage_reports", "name": "Manage Reports", "description": "Manage report schedules"},
-    {"id": "manage_credentials", "name": "Manage Credentials", "description": "Manage SSH and device credentials"},
-    {"id": "admin_access", "name": "Admin Access", "description": "Access admin panel and user management"},
-]
 
 
 def get_users_file():
@@ -86,7 +44,7 @@ def get_users_file():
             }
         ]
         # Write directly to file instead of calling save_users to avoid recursion
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
+        with open(USERS_FILE, "w", encoding=DEFAULT_ENCODING) as f:
             json.dump(default_users, f, indent=2, ensure_ascii=False)
     return USERS_FILE
 
@@ -95,7 +53,7 @@ def load_users() -> List[Dict]:
     """Load users from JSON file."""
     try:
         users_file = get_users_file()
-        with open(users_file, "r", encoding="utf-8") as f:
+        with open(users_file, "r", encoding=DEFAULT_ENCODING) as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
@@ -105,7 +63,7 @@ def save_users(users: List[Dict]):
     """Save users to JSON file."""
     # Ensure directory exists, but don't create default users here
     USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
+    with open(USERS_FILE, "w", encoding=DEFAULT_ENCODING) as f:
         json.dump(users, f, indent=2, ensure_ascii=False)
 
 
@@ -153,16 +111,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
 
 def verify_token(token: str) -> Optional[Dict]:
     """Verify and decode JWT token."""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return payload
     except JWTError:
         return None

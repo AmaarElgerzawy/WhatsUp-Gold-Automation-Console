@@ -1,31 +1,34 @@
 import { apiUrl } from "./config";
-
-const TOKEN_KEY = "wug_auth_token";
-const USER_KEY = "wug_user";
+import {
+  STORAGE_KEYS,
+  ENDPOINTS,
+  AUTH_HEADER_KEY,
+  AUTH_HEADER_PREFIX,
+} from "./constants";
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
 }
 
 export function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
 }
 
 export function removeToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
 }
 
 export function getUser() {
-  const userStr = localStorage.getItem(USER_KEY);
+  const userStr = localStorage.getItem(STORAGE_KEYS.USER);
   return userStr ? JSON.parse(userStr) : null;
 }
 
 export function setUser(user) {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 }
 
 export function removeUser() {
-  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(STORAGE_KEYS.USER);
 }
 
 export function logout() {
@@ -37,7 +40,7 @@ export function getAuthHeaders() {
   const token = getToken();
   return token
     ? {
-        Authorization: `Bearer ${token}`,
+        [AUTH_HEADER_KEY]: `${AUTH_HEADER_PREFIX} ${token}`,
       }
     : {};
 }
@@ -49,7 +52,7 @@ export async function checkAuth() {
   }
 
   try {
-    const res = await fetch(apiUrl("auth/me"), {
+    const res = await fetch(apiUrl(ENDPOINTS.AUTH_ME), {
       headers: getAuthHeaders(),
     });
 
@@ -74,9 +77,12 @@ export async function checkPageAccess(page) {
   }
 
   try {
-    const res = await fetch(apiUrl(`auth/check-page-access?page=${page}`), {
-      headers: getAuthHeaders(),
-    });
+    const res = await fetch(
+      apiUrl(`${ENDPOINTS.AUTH_CHECK_PAGE_ACCESS}?page=${page}`),
+      {
+        headers: getAuthHeaders(),
+      }
+    );
 
     if (!res.ok) {
       return false;

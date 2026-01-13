@@ -1,5 +1,6 @@
 import { getAuthHeaders } from "./auth";
 import { apiUrl } from "./config";
+import { CONTENT_TYPES, HTTP_STATUS } from "./constants";
 
 /**
  * Helper function to make authenticated API calls
@@ -16,17 +17,17 @@ export async function apiCall(path, options = {}) {
 
   // If body is FormData, don't set Content-Type (browser will set it with boundary)
   if (!(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
+    headers["Content-Type"] = CONTENT_TYPES.JSON;
   }
 
   const response = await fetch(url, {
     ...options,
     headers,
-    credentials: "include"
+    credentials: "include",
   });
 
   // If unauthorized, clear auth and redirect to login
-  if (response.status === 401) {
+  if (response.status === HTTP_STATUS.UNAUTHORIZED) {
     localStorage.removeItem("wug_auth_token");
     localStorage.removeItem("wug_user");
     window.location.reload();
