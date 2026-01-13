@@ -84,7 +84,15 @@ def send_all_reports_via_email(start_date, end_date):
         print("ERROR sending email:", e)
 
 # ========== CONFIG ==========
-CONN_STR = r"Driver={ODBC Driver 17 for SQL Server};Server=localhost;Database=WhatsUp;Trusted_Connection=yes;"
+CONNECTION_STRING = (
+    "Driver={ODBC Driver 18 for SQL Server};"
+    "Server=localhost;"
+    "Database=WhatsUp;"
+    "UID=maxor;"
+    "PWD=MAXOR321;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=yes;"
+)
 WEB_USER_ID = 1  # same web user as in WUG (nWebUserID)
 OUTPUT_FOLDER = r"C:\WUG_Exports"
 SQL_PERCENT_MULTIPLIER = 1000000000.0
@@ -452,7 +460,7 @@ BEGIN
 END;
 """
 
-    conn = pyodbc.connect(CONN_STR)
+    conn = pyodbc.connect(CONNECTION_STRING)
     cursor = conn.cursor()
 
     cursor.execute(sql_template)
@@ -671,7 +679,7 @@ def get_device_groups():
     Returns list of (group_id, group_name) from DeviceGroup.
     Uses exactly: SELECT nDeviceGroupID, sGroupName FROM DeviceGroup;
     """
-    conn = pyodbc.connect(CONN_STR)
+    conn = pyodbc.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     cursor.execute("SELECT nDeviceGroupID, sGroupName FROM DeviceGroup;")
     rows = cursor.fetchall()

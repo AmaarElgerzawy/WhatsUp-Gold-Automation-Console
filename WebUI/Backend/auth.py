@@ -27,6 +27,7 @@ PAGE_PRIVILEGES = {
     "history": "view_history",
     "backups": "view_backups",
     "reports": "manage_reports",
+    "generatereports": "manage_reports",
     "credentials": "manage_credentials",
     "admin": "admin_access",
 }

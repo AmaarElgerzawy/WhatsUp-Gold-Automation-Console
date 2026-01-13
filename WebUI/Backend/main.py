@@ -30,9 +30,8 @@ from auth import (
     ROLE_PRIVILEGES,
     AVAILABLE_PRIVILEGES,
     ACCESS_TOKEN_EXPIRE_MINUTES,
-)
-
-# ================= CONFIG =================
+) 
+from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group  # ================= CONFIG =================
 BASEDIR = Path(__file__).resolve().parent
 
 # Scripts directory (all scripts are now in backend/scripts/)
@@ -1022,3 +1021,36 @@ def save_report_schedule(
     except Exception as e:
         raise HTTPException(500, str(e))
 
+@app.get("/reports/groups")
+def list_groups():
+    groups = get_device_groups()
+    return [{"id": gid, "name": name} for gid, name in groups]
+
+@app.post("/reports/manual")
+def generate_manual_report(
+    group_id: int,
+    group_name: str,
+    start: str,   # ISO string
+    end: str
+):
+    try:
+        start_dt = datetime.fromisoformat(start)
+        end_dt = datetime.fromisoformat(end)
+
+        path = write_excel_for_group(
+            device_group_id=group_id,
+            start_date=start_dt,
+            end_date=end_dt,
+            group_name=group_name
+        )
+
+        return {"path": path, "filename": os.path.basename(path)}
+
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.get("/reports/download")
+def download_report(path: str):
+    if not os.path.exists(path):
+        raise HTTPException(404, "File not found")
+    return FileResponse(path, filename=os.path.basename(path))

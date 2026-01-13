@@ -9,6 +9,7 @@ import CredentialsManager from "./CredentialsManager";
 import Admin from "./Admin";
 import Login from "./Login";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ManualReports from "./ManualReports";
 import { checkAuth, logout as authLogout, getUser } from "./utils/auth";
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
       history: "view_history",
       backups: "view_backups",
       reports: "manage_reports",
+      generatereports: "manage_reports",
       credentials: "manage_credentials",
       admin: "admin_access",
     };
@@ -222,6 +224,26 @@ export default function App() {
                   </div>
                 </button>
               )}
+
+            {user.privileges &&
+              Array.isArray(user.privileges) &&
+              user.privileges.includes("manage_reports") && (
+                <button
+                  className={
+                    "nav-button" +
+                    (page === "generatereports" ? " nav-button--active" : "")
+                  }
+                  onClick={() => setPage("generatereports")}
+                >
+                  <span className="nav-button-icon">📊</span>
+                  <div className="nav-button-label">
+                    Generate Manual Report
+                    <div className="nav-button-sub">
+                      Control recurring exports
+                    </div>
+                  </div>
+                </button>
+              )}
           </div>
 
           {user.privileges &&
@@ -297,6 +319,11 @@ export default function App() {
           {page === "reports" && (
             <ProtectedRoute page="reports" user={user}>
               <ReportSchedule />
+            </ProtectedRoute>
+          )}
+          {page === "generatereports" && (
+            <ProtectedRoute page="generatereports" user={user}>
+              <ManualReports />
             </ProtectedRoute>
           )}
           {page === "credentials" && (

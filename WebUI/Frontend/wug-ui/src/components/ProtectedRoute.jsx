@@ -20,6 +20,7 @@ export default function ProtectedRoute({ page, children, user }) {
         history: "view_history",
         backups: "view_backups",
         reports: "manage_reports",
+        generatereports: "manage_reports",
         credentials: "manage_credentials",
         admin: "admin_access",
       };
