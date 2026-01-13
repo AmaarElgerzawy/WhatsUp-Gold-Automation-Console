@@ -97,25 +97,31 @@ export default function ManualReports() {
               ))}
             </select>
           </div>
+          <div className="from-group">
+            <div className="form-group">
+              <label className="form-label">Start Date & Time</label>
+              <div className="date-box">
+                <input
+                  className="input input--clean"
+                  value={start}
+                  type="date"
+                  onChange={(e) => setStart(e.target.value)}
+                />
+              </div>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Start Date & Time</label>
-            <input
-              type="datetime-local"
-              className="input"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">End Date & Time</label>
-            <input
-              type="datetime-local"
-              className="input"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-            />
+            <div className="form-group">
+              <label className="form-label">End Date & Time</label>
+              <div className="date-box">
+                <input
+                  className="input input--clean"
+                  placeholder="YYYY-MM-DD"
+                  value={end}
+                  type="date"
+                  onChange={(e) => setEnd(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
