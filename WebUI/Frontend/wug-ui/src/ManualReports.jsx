@@ -29,14 +29,15 @@ export default function ManualReports() {
     setFile(null);
 
     try {
-      const res = await apiCall("reports/manual", {
+      const params = new URLSearchParams({
+        group_id: groupId,
+        group_name: groupName,
+        start,
+        end,
+      });
+
+      const res = await apiCall(`reports/manual?${params.toString()}`, {
         method: "POST",
-        body: JSON.stringify({
-          group_id: Number(groupId),
-          group_name: groupName,
-          start,
-          end,
-        }),
       });
 
       const data = await res.json();
@@ -130,9 +131,7 @@ export default function ManualReports() {
           </button>
         </div>
 
-        {error && (
-          <pre className="mono-output mono-output--error">{error}</pre>
-        )}
+        {error && <pre className="mono-output mono-output--error">{error}</pre>}
 
         {file && (
           <div style={{ marginTop: 20 }}>
