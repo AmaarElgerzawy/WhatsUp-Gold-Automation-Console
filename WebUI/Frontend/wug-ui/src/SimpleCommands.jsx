@@ -6,6 +6,7 @@ import { apiCall } from "./utils/api";
 export default function SimpleCommands() {
   const [routers, setRouters] = useState("");
   const [commands, setCommands] = useState("");
+  const [loading, setLoading] = useState(false);
   const [selectedCredId, setSelectedCredId] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -60,6 +61,8 @@ export default function SimpleCommands() {
       return;
     }
 
+    setLoading(true);
+
     const fd = new FormData();
     fd.append("routers", routers.trim());
     fd.append("config", commands.trim());
@@ -91,6 +94,8 @@ export default function SimpleCommands() {
       setOutput(data.stdout || data.stderr || "No output");
     } catch (e) {
       setOutput(`Error: ${e.toString()}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -204,8 +209,14 @@ export default function SimpleCommands() {
       </div>
 
       <div style={{ marginTop: 18 }}>
-        <button className="button button--primary" type="button" onClick={run}>
-          <span className="button-icon">▶</span>Run config
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={run}
+          disabled={loading}
+        >
+          <span className="button-icon">▶</span>
+          {loading ? "Running…" : "Run interactive commands"}
         </button>
       </div>
 
