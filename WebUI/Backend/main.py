@@ -1034,16 +1034,23 @@ def save_report_schedule(
         raise HTTPException(500, str(e))
 
 @app.get("/reports/groups")
-def list_groups():
+def list_groups(current_user: dict = Depends(require_privilege("manage_reports"))):
     groups = get_device_groups()
+    log_activity(
+        current_user["id"],
+        "list_report_groups",
+        "Viewed device groups for reports",
+        "reports"
+    )
     return [{"id": gid, "name": name} for gid, name in groups]
 
 @app.post("/reports/manual")
 def generate_manual_report(
     group_id: int,
     group_name: str,
-    start: str,   # ISO string
-    end: str
+    start: str,
+    end: str,
+    current_user: dict = Depends(require_privilege("manage_reports"))
 ):
     try:
         start_dt = datetime.fromisoformat(start)
@@ -1056,13 +1063,31 @@ def generate_manual_report(
             group_name=group_name
         )
 
+        log_activity(
+            current_user["id"],
+            "manual_report",
+            f"Generated report for {group_name} from {start} to {end}",
+            "reports"
+        )
+
         return {"path": path, "filename": os.path.basename(path)}
 
     except Exception as e:
         raise HTTPException(500, str(e))
 
 @app.get("/reports/download")
-def download_report(path: str):
+def download_report(
+    path: str,
+    current_user: dict = Depends(require_privilege("manage_reports"))
+):
     if not os.path.exists(path):
         raise HTTPException(404, "File not found")
+
+    log_activity(
+        current_user["id"],
+        "download_report",
+        f"Downloaded report {os.path.basename(path)}",
+        "reports"
+    )
+
     return FileResponse(path, filename=os.path.basename(path))
