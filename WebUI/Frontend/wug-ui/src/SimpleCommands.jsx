@@ -216,7 +216,7 @@ export default function SimpleCommands() {
           disabled={loading}
         >
           <span className="button-icon">▶</span>
-          {loading ? "Running…" : "Run interactive commands"}
+          {loading ? "Running…" : "Run"}
         </button>
       </div>
 
