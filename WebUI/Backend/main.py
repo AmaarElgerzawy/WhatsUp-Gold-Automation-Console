@@ -1078,16 +1078,8 @@ def generate_manual_report(
 @app.get("/reports/download")
 def download_report(
     path: str,
-    current_user: dict = Depends(require_privilege("manage_reports"))
 ):
     if not os.path.exists(path):
         raise HTTPException(404, "File not found")
-
-    log_activity(
-        current_user["id"],
-        "download_report",
-        f"Downloaded report {os.path.basename(path)}",
-        "reports"
-    )
 
     return FileResponse(path, filename=os.path.basename(path))
