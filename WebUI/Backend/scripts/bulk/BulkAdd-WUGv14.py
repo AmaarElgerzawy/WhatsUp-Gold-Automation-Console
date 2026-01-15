@@ -1,6 +1,7 @@
 import csv
 import pyodbc
 import sys
+from ....Backend.constants import CONNECTION_STRING
 
 # ------------------------
 # Configuration
@@ -9,16 +10,6 @@ CSV_PATH = sys.argv[1]
 DEFAULT_WORST_STATE_ID = 1
 DEFAULT_BEST_STATE_ID = 1
 TEMP_DEFAULT_NETIF_ID = 0   # Change if your DB forbids 0
-
-CONNECTION_STRING = (
-    "Driver={ODBC Driver 18 for SQL Server};"
-    "Server=localhost;"
-    "Database=WhatsUp;"
-    "UID=maxor;"
-    "PWD=MAXOR321;"
-    "Encrypt=yes;"
-    "TrustServerCertificate=yes;"
-)
 # ------------------------
 
 # Load CSV

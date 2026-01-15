@@ -5,7 +5,7 @@ from getpass import getpass
 import json
 import os
 import sys
-
+from ...constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 # ---------- SETTINGS ----------
 base_dir = os.path.dirname(os.path.abspath(__file__))
 ROUTER_LIST_FILE = os.environ.get("WUG_ROUTERS")
@@ -13,9 +13,7 @@ TASKS_FILE = os.environ.get("WUG_TASKS")
 LOG_DIR = Path(os.path.join(base_dir, "bulk_sequence_logs"))
 LOG_DIR.mkdir(exist_ok=True)
 
-
 # ---------- GENERIC INTERACTIVE HELPER ----------
-
 def run_interactive_command(conn, command, steps, context=None, max_rounds=10):
     """
     Run an interactive EXEC command on a Netmiko connection.
@@ -59,10 +57,7 @@ def run_interactive_command(conn, command, steps, context=None, max_rounds=10):
             break
 
     return full_output
-
-
 # ---------- LOAD ROUTER IPs ----------
-
 ips = []
 
 if not ROUTER_LIST_FILE:
@@ -97,16 +92,6 @@ if not isinstance(tasks, list):
 
 print(f"Loaded {len(tasks)} task(s)")
 
-
-# ---------- CREDENTIALS ----------
-username = os.environ.get("WUG_SSH_USER")
-password = os.environ.get("WUG_SSH_PASS")
-enable_password = os.environ.get("WUG_SSH_ENABLE", password)
-
-if not username or not password:
-    print("ERROR: Missing SSH credentials", file=sys.stderr)
-    sys.exit(1)
-
 timestamp_global = datetime.now().strftime("%Y%m%d-%H%M%S")
 # ---------- MAIN LOOP PER ROUTER ----------
 
@@ -116,9 +101,9 @@ for ip in ips:
     device = {
         "device_type": "cisco_ios",   # change if needed
         "ip": ip,
-        "username": username,
-        "password": password,
-        "secret": enable_password,
+        "username": SSH_USERNAME,
+        "password": SSH_PASSWORD,
+        "secret": SSH_ENABLE_PASSWORD,
     }
 
     log_file = LOG_DIR / f"{ip}_sequence_{timestamp_global}.log"

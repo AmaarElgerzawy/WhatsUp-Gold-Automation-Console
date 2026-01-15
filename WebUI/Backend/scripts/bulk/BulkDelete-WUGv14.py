@@ -2,17 +2,9 @@
 # Usage: python bulk_delete_wug.py devices_to_delete.csv
 
 import csv, sys, pyodbc, traceback
+from ....Backend.constants import CONNECTION_STRING
 
 # ------------- CONFIG (edit) -------------
-CONNECTION_STRING = (
-    "Driver={ODBC Driver 18 for SQL Server};"
-    "Server=localhost;"
-    "Database=WhatsUp;"
-    "UID=maxor;"
-    "PWD=MAXOR321;"
-    "Encrypt=yes;"
-    "TrustServerCertificate=yes;"
-)
 CSV_PATH = sys.argv[1]
 # -----------------------------------------
 

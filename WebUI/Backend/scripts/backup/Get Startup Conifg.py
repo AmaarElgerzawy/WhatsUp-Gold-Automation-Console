@@ -2,6 +2,7 @@ from netmiko import ConnectHandler
 from getpass import getpass
 from pathlib import Path
 from datetime import datetime
+from ....Backend.constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 
 # ---------- SETTINGS ----------
 ROUTER_LIST_FILE = "routers.txt"
@@ -21,12 +22,6 @@ if not ips:
 
 print(f"Found {len(ips)} router(s) in {ROUTER_LIST_FILE}")
 
-# ---------- CREDENTIALS ----------
-username = 'admin'
-password = 'maxor'
-enable_password = 'MAXOR321'
-if not enable_password:
-    enable_password = password
 
 # ---------- MAIN LOOP ----------
 for ip in ips:
@@ -35,9 +30,9 @@ for ip in ips:
     device = {
         "device_type": "cisco_ios",
         "ip": ip,
-        "username": username,
-        "password": password,
-        "secret": enable_password,
+        "username": SSH_USERNAME,
+        "password": SSH_PASSWORD,
+        "secret": SSH_ENABLE_PASSWORD,
     }
 
     folder = Path(f"./backups/{ip}")

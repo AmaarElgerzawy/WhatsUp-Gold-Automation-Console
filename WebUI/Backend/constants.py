@@ -21,7 +21,7 @@ CONNECTION_STRING = (
 
 # ================= API & SECURITY CONFIGURATION =================
 # CORS allowed origins
-ALLOWED_ORIGINS = ["http://api:3000", "http://wug.automation:3000"]
+ALLOWED_ORIGINS = ["http://wug.automation:3000"]
 
 # JWT Configuration
 JWT_SECRET_KEY = os.environ.get("WUG_JWT_SECRET", "your-secret-key-change-in-production-min-32-chars")
@@ -37,6 +37,23 @@ BULK_SCRIPTS_DIR = SCRIPTS_DIR / "bulk"
 ROUTER_SCRIPTS_DIR = SCRIPTS_DIR / "routers"
 BACKUP_SCRIPTS_DIR = SCRIPTS_DIR / "backup"
 REPORTING_SCRIPTS_DIR = SCRIPTS_DIR / "reporting"
+
+# SSH CREDIT
+SSH_USERNAME = 'admin'
+SSH_PASSWORD = 'maxor'
+SSH_ENABLE_PASSWORD = 'MAXOR321'
+if not SSH_ENABLE_PASSWORD:
+    SSH_ENABLE_PASSWORD = SSH_PASSWORD
+
+# ===== EMAIL CONFIG (Brevo) =====
+SMTP_SERVER = "smtp-relay.brevo.com"
+SMTP_PORT = 587
+
+BREVO_USERNAME = "9c44f9001@smtp-brevo.com"          # your Brevo SMTP login (e.g. 9c44f9...@smtp-brevo.com)
+BREVO_SMTP_KEY = "q3bw9TXCtpLU4Qhj"             # your Brevo SMTP key / password
+
+SENDER = "snipergolden1234@gmail.com"
+RECEIVER = "snipergolden1234@gmail.com"  # can be your Gmail or a list later
 
 # Data directories
 DATA_DIR = BASEDIR / "data"

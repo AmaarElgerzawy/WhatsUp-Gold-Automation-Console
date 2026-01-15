@@ -14,16 +14,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 import pandas as pd
+from ....Backend.constants import CONNECTION_STRING, SMTP_SERVER, SMTP_PORT, BREVO_USERNAME, BREVO_SMTP_KEY, SENDER, RECEIVER
 
-# ===== EMAIL CONFIG (Brevo) =====
-SMTP_SERVER = "smtp-relay.brevo.com"
-SMTP_PORT = 587
-
-BREVO_USERNAME = "9c44f9001@smtp-brevo.com"          # your Brevo SMTP login (e.g. 9c44f9...@smtp-brevo.com)
-BREVO_SMTP_KEY = "q3bw9TXCtpLU4Qhj"             # your Brevo SMTP key / password
-
-SENDER = "snipergolden1234@gmail.com"
-RECEIVER = "snipergolden1234@gmail.com"  # can be your Gmail or a list later
 
 # This should match your report folder from the other script
 OUTPUT_FOLDER = r"C:\WUG_Exports"
@@ -84,15 +76,6 @@ def send_all_reports_via_email(start_date, end_date):
         print("ERROR sending email:", e)
 
 # ========== CONFIG ==========
-CONNECTION_STRING = (
-    "Driver={ODBC Driver 18 for SQL Server};"
-    "Server=localhost;"
-    "Database=WhatsUp;"
-    "UID=maxor;"
-    "PWD=MAXOR321;"
-    "Encrypt=yes;"
-    "TrustServerCertificate=yes;"
-)
 WEB_USER_ID = 1  # same web user as in WUG (nWebUserID)
 OUTPUT_FOLDER = r"C:\WUG_Exports"
 SQL_PERCENT_MULTIPLIER = 1000000000.0

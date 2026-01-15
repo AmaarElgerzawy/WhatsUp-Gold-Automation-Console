@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiCall } from "./utils/api";
+import { API_BASE_URL } from "./utils/constants";
 
 export default function ManualReports() {
   const [groups, setGroups] = useState([]);
@@ -146,7 +147,7 @@ export default function ManualReports() {
               <div style={{ marginTop: 8 }}>
                 <a
                   className="button button--primary"
-                  href={`http://localhost:8000/reports/download?path=${encodeURIComponent(
+                  href={`${API_BASE_URL}/reports/download?path=${encodeURIComponent(
                     file.path
                   )}`}
                 >

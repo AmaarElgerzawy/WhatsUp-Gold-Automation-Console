@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import datetime
 import os
 import sys
+from ...constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 
 # ---------- SETTINGS ----------
 # ⬇️ CHANGE 1: paths come from API
@@ -30,17 +31,6 @@ if not ips:
     sys.exit(1)
 
 print(f"Found {len(ips)} router(s)")
-
-# ---------- CREDENTIALS ----------
-# ⬇️ CHANGE 2: creds from API
-username = os.environ.get("WUG_SSH_USER")
-password = os.environ.get("WUG_SSH_PASS")
-enable_password = os.environ.get("WUG_SSH_ENABLE", password)
-
-if not username or not password:
-    print("ERROR: Missing SSH credentials", file=sys.stderr)
-    sys.exit(1)
-
 # ---------- MAIN LOOP ----------
 timestamp_global = datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -50,9 +40,9 @@ for ip in ips:
     device = {
         "device_type": "cisco_ios",
         "ip": ip,
-        "username": username,
-        "password": password,
-        "secret": enable_password,
+        "username": SSH_USERNAME,
+        "password": SSH_PASSWORD,
+        "secret": SSH_ENABLE_PASSWORD,
     }
 
     log_file = LOG_DIR / f"{ip}_push_{timestamp_global}.log"
