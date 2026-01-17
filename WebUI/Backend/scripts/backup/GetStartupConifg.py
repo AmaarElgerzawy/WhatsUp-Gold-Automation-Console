@@ -6,7 +6,7 @@ from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD, BASEDIR
 
 # ---------- SETTINGS ----------
 ROUTER_LIST_FILE = BASEDIR / "scripts/backup" / "routers.txt"
-OUTPUT_DIR = Path("backups")   # folder to store configs
+OUTPUT_DIR = BASEDIR / "scripts/backup" /Path("backups")   # folder to store configs
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # ---------- LOAD ROUTER IPs ----------
