@@ -664,7 +664,7 @@ def get_device_groups():
     """
     conn = pyodbc.connect(CONNECTION_STRING)
     cursor = conn.cursor()
-    cursor.execute("SELECT nDeviceGroupID, sGroupName FROM DeviceGroup where nDeviceGroupID not in (select nDeviceGroupID from PivotDeviceToGroup);")
+    cursor.execute("SELECT nDeviceGroupID, sGroupName FROM DeviceGroup where nDeviceGroupID in (select nDeviceGroupID from PivotDeviceToGroup);")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
