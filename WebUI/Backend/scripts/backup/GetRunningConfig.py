@@ -44,7 +44,7 @@ for ip in ips:
         conn.enable()  # enter enable mode if needed
 
         print(f"Getting running-config from {ip} ...")
-        running_config = conn.send_command("show running-config", expect_string=r"#")
+        running_config = conn.send_command("show running-config", expect_string=r"#", read_timeout=60)
 
         conn.disconnect()
 
