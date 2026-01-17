@@ -1,9 +1,11 @@
-from netmiko import ConnectHandler
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from netmiko import ConnectHandler
 from datetime import datetime
 import os
-import sys
-from ...constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
+from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 
 # ---------- SETTINGS ----------
 # ⬇️ CHANGE 1: paths come from API

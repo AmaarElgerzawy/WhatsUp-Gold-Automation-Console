@@ -1,8 +1,14 @@
 # bulk_delete_wug.py
 # Usage: python bulk_delete_wug.py devices_to_delete.csv
 
-import csv, sys, pyodbc, traceback
-from ...constants import CONNECTION_STRING
+import csv
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+import pyodbc
+import traceback
+from constants import CONNECTION_STRING
 
 # ------------- CONFIG (edit) -------------
 CSV_PATH = sys.argv[1]

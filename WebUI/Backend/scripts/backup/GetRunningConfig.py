@@ -1,8 +1,11 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 from netmiko import ConnectHandler
 from getpass import getpass
-from pathlib import Path
 from datetime import datetime
-from ...constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
+from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 # ---------- SETTINGS ----------
 ROUTER_LIST_FILE = "routers.txt"
 OUTPUT_DIR = Path("backups")   # folder to store configs

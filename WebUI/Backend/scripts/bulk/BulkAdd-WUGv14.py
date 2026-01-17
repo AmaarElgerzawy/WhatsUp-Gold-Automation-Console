@@ -1,7 +1,10 @@
 import csv
-import pyodbc
 import sys
-from ...constants import CONNECTION_STRING
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+import pyodbc
+from constants import CONNECTION_STRING
 
 # ------------------------
 # Configuration
