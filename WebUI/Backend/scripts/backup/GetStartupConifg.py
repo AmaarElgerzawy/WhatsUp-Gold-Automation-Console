@@ -2,10 +2,10 @@ from netmiko import ConnectHandler
 from getpass import getpass
 from pathlib import Path
 from datetime import datetime
-from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
+from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD, BASEDIR
 
 # ---------- SETTINGS ----------
-ROUTER_LIST_FILE = "routers.txt"
+ROUTER_LIST_FILE = BASEDIR / "scripts/backup" / "routers.txt"
 OUTPUT_DIR = Path("backups")   # folder to store configs
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -35,8 +35,6 @@ for ip in ips:
         "secret": SSH_ENABLE_PASSWORD,
     }
 
-    folder = Path(f"./backups/{ip}")
-    folder.mkdir(parents=True, exist_ok=True)
     try:
         conn = ConnectHandler(**device)
         conn.enable()  # enter enable mode if needed
@@ -48,8 +46,8 @@ for ip in ips:
 
         # Save to file
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        filename = folder / f"startup_config_{timestamp}.txt"
-
+        filename = Path(OUTPUT_DIR/ ip / f"startup_config_{timestamp}.txt")
+        filename.parent.mkdir(parents=True, exist_ok=True)
         filename.write_text(startup_config, encoding="utf-8")
         print(f"Saved config to {filename}")
 
