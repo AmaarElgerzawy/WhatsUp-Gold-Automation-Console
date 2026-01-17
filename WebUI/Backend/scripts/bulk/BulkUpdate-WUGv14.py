@@ -1,5 +1,5 @@
 import csv, sys, pyodbc, traceback
-from constants import CONNECTION_STRING
+from ...constants import CONNECTION_STRING
 
 # ----------------- CONFIG --------------------
 CSV_PATH = sys.argv[1]

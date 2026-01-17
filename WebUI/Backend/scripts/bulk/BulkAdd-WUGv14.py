@@ -1,7 +1,7 @@
 import csv
 import pyodbc
 import sys
-from constants import CONNECTION_STRING
+from ...constants import CONNECTION_STRING
 
 # ------------------------
 # Configuration

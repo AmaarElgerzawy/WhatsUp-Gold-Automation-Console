@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 import os
 import sys
-from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
+from ...constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 
 # ---------- SETTINGS ----------
 # ⬇️ CHANGE 1: paths come from API

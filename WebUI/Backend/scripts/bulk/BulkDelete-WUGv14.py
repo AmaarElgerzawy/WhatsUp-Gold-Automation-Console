@@ -2,7 +2,7 @@
 # Usage: python bulk_delete_wug.py devices_to_delete.csv
 
 import csv, sys, pyodbc, traceback
-from constants import CONNECTION_STRING
+from ...constants import CONNECTION_STRING
 
 # ------------- CONFIG (edit) -------------
 CSV_PATH = sys.argv[1]
