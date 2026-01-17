@@ -5,7 +5,7 @@ from getpass import getpass
 import json
 import os
 import sys
-from ...constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
+from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 # ---------- SETTINGS ----------
 base_dir = os.path.dirname(os.path.abspath(__file__))
 ROUTER_LIST_FILE = os.environ.get("WUG_ROUTERS")
