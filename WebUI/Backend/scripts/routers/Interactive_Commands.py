@@ -153,7 +153,12 @@ for ip in ips:
                     log_output += "No command defined.\n"
                     continue
 
-                out = conn.send_command(command)
+                out = conn.send_command(
+                    command,
+                    expect_string=r"#",
+                    read_timeout=60
+                )
+
                 log_output += out + "\n"
 
             elif ttype == "interactive_exec":
