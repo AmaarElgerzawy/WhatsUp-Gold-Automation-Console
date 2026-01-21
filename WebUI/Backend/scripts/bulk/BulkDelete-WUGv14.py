@@ -22,6 +22,16 @@ def connect():
     conn.autocommit = False
     return conn
 
+def find_device_by_both(cursor, name, addr):
+    cursor.execute("""
+        SELECT d.nDeviceID 
+        FROM Device d
+        JOIN NetworkInterface ni ON ni.nDeviceID = d.nDeviceID
+        WHERE d.sDisplayName = ? AND ni.sNetworkAddress = ?
+    """, name, addr)
+    row = cursor.fetchone()
+    return row[0] if row else None
+
 def find_device_by_display(cursor, name):
     cursor.execute("SELECT nDeviceID FROM Device WHERE sDisplayName = ?", name)
     row = cursor.fetchone()
@@ -59,7 +69,9 @@ def main():
         headers = [h.lower() for h in reader.fieldnames]
 
         mode = None
-        if "sdisplayname" in headers:
+        if "sdisplayname" in headers and "snetworkaddress" in headers:
+            mode = "both"
+        elif "sdisplayname" in headers:
             mode = "display"
         elif "snetworkaddress" in headers:
             mode = "address"
@@ -73,7 +85,9 @@ def main():
                 addr = row.get("sNetworkAddress") or row.get("snetworkaddress")
 
                 device_id = None
-                if mode == "display":
+                if mode == "both":
+                    device_id = find_device_by_both(cur, name, addr)
+                elif mode == "display":
                     device_id = find_device_by_display(cur, name)
                 else:
                     device_id = find_device_by_address(cur, addr)
