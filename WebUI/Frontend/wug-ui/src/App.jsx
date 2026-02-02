@@ -10,6 +10,7 @@ import Admin from "./Admin";
 import Login from "./Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ManualReports from "./ManualReports";
+import DeviceUpTimeReport from "./DeviceUpTimeReport";
 import { checkAuth, logout as authLogout, getUser } from "./utils/auth";
 import {
   PAGE_PRIVILEGE_MAP,
@@ -42,7 +43,7 @@ export default function App() {
     if (requiredPrivilege && !user.privileges.includes(requiredPrivilege)) {
       // Find first available page
       const availablePage = Object.keys(PAGE_PRIVILEGE_MAP).find((p) =>
-        user.privileges.includes(PAGE_PRIVILEGE_MAP[p])
+        user.privileges.includes(PAGE_PRIVILEGE_MAP[p]),
       );
       if (availablePage) {
         setPage(availablePage);
@@ -213,29 +214,9 @@ export default function App() {
                 >
                   <span className="nav-button-icon">📊</span>
                   <div className="nav-button-label">
-                    Report schedule
+                    Reports
                     <div className="nav-button-sub">
-                      Control recurring exports
-                    </div>
-                  </div>
-                </button>
-              )}
-
-            {user.privileges &&
-              Array.isArray(user.privileges) &&
-              user.privileges.includes(PRIVILEGES.MANAGE_REPORTS) && (
-                <button
-                  className={
-                    "nav-button" +
-                    (page === "generatereports" ? " nav-button--active" : "")
-                  }
-                  onClick={() => setPage("generatereports")}
-                >
-                  <span className="nav-button-icon">📊</span>
-                  <div className="nav-button-label">
-                    Generate Manual Report
-                    <div className="nav-button-sub">
-                      Control recurring exports
+                      Schedule, manual & uptime reports
                     </div>
                   </div>
                 </button>
@@ -315,11 +296,8 @@ export default function App() {
           {page === "reports" && (
             <ProtectedRoute page="reports" user={user}>
               <ReportSchedule />
-            </ProtectedRoute>
-          )}
-          {page === "generatereports" && (
-            <ProtectedRoute page="generatereports" user={user}>
               <ManualReports />
+              <DeviceUpTimeReport />
             </ProtectedRoute>
           )}
           {page === "credentials" && (

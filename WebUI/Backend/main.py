@@ -88,6 +88,7 @@ from constants import (
 )
 
 from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group
+from scripts.reporting.DeviceUpTimeReport import run_sp_group_device_uptime, write_excel
 
 # ================= INITIALIZATION =================
 # Ensure data directories exist
@@ -1083,3 +1084,36 @@ def download_report(
         raise HTTPException(404, "File not found")
 
     return FileResponse(path, filename=os.path.basename(path))
+
+@app.post("/reports/uptime")
+def generate_uptime_report(
+    group_id: int,
+    group_name: str,
+    start: str,
+    end: str,
+    current_user: dict = Depends(require_privilege("manage_reports"))
+):
+    try:
+        start_dt = datetime.fromisoformat(start)
+        end_dt = datetime.fromisoformat(end)
+
+        # Get uptime data from DeviceUpTimeReport
+        rows = run_sp_group_device_uptime(group_id, start_dt, end_dt)
+        
+        if not rows:
+            raise HTTPException(400, f"No data found for group {group_id}")
+
+        # Generate Excel file
+        path = write_excel(group_name, rows, start_dt, end_dt)
+
+        log_activity(
+            current_user["id"],
+            "uptime_report",
+            f"Generated uptime report for {group_name} from {start} to {end}",
+            "reports"
+        )
+
+        return {"path": path, "filename": os.path.basename(path)}
+
+    except Exception as e:
+        raise HTTPException(500, str(e))
