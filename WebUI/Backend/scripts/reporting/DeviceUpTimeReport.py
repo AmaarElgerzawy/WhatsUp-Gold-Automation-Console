@@ -188,16 +188,3 @@ def write_excel(group_name, rows, start_date, end_date):
     wb.save(path)
     print(f"Excel written: {path}")
     return path
-
-
-# ================= RUN =================
-
-if __name__ == "__main__":
-    group_id = 49
-    group_name = "Device Group 49"
-
-    start = datetime(2026, 1, 1)
-    end = datetime(2026, 1, 31)
-
-    rows = run_sp_group_device_uptime(group_id, start, end)
-    write_excel(group_name, rows, start, end)
