@@ -120,7 +120,7 @@ def write_excel(group_name, rows, start_date, end_date):
     safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in group_name)
     path = os.path.join(
         OUTPUT_FOLDER,
-        f"ActiveMonitorAvailability_{safe_name}.xlsx"
+        f"DeviceUpTime_{safe_name}.xlsx"
     )
 
     wb = Workbook()
