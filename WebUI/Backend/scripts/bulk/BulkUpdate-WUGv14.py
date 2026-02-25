@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import pyodbc
 import traceback
-from constants import CONNECTION_STRING
+from constants import get_connection_string
 
 # ----------------- CONFIG --------------------
 CSV_PATH = sys.argv[1]
@@ -15,7 +15,7 @@ def debug(msg):
     print(msg, flush=True)
 
 def connect():
-    conn = pyodbc.connect(CONNECTION_STRING, autocommit=False)
+    conn = pyodbc.connect(get_connection_string(), autocommit=False)
     conn.autocommit = False
     return conn
 

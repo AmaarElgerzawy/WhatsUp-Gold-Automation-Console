@@ -55,7 +55,6 @@ from constants import (
     REPORT_SCHEDULE_FILE,
     SCRIPTS,
     CSV_NAMES,
-    CONNECTION_STRING,
     ENV_WUG_ROUTERS,
     ENV_WUG_TASKS,
     ENV_WUG_SSH_USER,
@@ -85,6 +84,7 @@ from constants import (
     LOG_PREFIX_EXIT_CODE,
     LOG_PREFIX_STDOUT,
     LOG_PREFIX_STDERR,
+    get_connection_string,
 )
 
 from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group
@@ -188,7 +188,7 @@ def save_templates(data):
     )
 # ================= DB HELPERS =================
 def get_conn():
-    return pyodbc.connect(CONNECTION_STRING)
+    return pyodbc.connect(get_connection_string())
 
 def load_device_types():
     conn = get_conn()
@@ -775,6 +775,45 @@ def get_admin_privileges_list(current_user: dict = Depends(require_privilege("ad
         "privileges": AVAILABLE_PRIVILEGES,
         "page_privileges": PAGE_PRIVILEGES,
     }
+
+
+@app.get("/admin/db-connection")
+def get_db_connection_settings(
+    current_user: dict = Depends(require_privilege("admin_access")),
+):
+    """Get current database connection string (admin only)."""
+    return {
+        "connection_string": get_connection_string(),
+    }
+
+
+@app.put("/admin/db-connection")
+def update_db_connection_settings(
+    payload: dict = Body(...),
+    current_user: dict = Depends(require_privilege("admin_access")),
+):
+    """Update database connection string and persist it (admin only)."""
+    value = (payload.get("connection_string") or "").strip()
+    if not value:
+        raise HTTPException(400, "connection_string is required")
+
+    config_path = DATA_DIR / "db_connection.json"
+    try:
+        config_path.write_text(
+            json.dumps({"connection_string": value}, indent=2),
+            encoding="utf-8",
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Failed to save connection string: {e}")
+
+    log_activity(
+        current_user["id"],
+        "update_db_connection",
+        "Updated database connection string",
+        "admin",
+    )
+
+    return {"status": "saved"}
 
 @app.get("/admin/bulk-templates")
 def get_bulk_templates(current_user: dict = Depends(require_privilege("admin_access"))):

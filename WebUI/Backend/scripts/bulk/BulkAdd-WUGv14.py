@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import pyodbc
-from constants import CONNECTION_STRING
+from constants import get_connection_string
 
 # ------------------------
 # Configuration
@@ -107,7 +107,7 @@ sql = sql_template.format(
 )
 
 # Connect to SQL Server
-conn = pyodbc.connect(CONNECTION_STRING)
+conn = pyodbc.connect(get_connection_string())
 cursor = conn.cursor()
 cursor.fast_executemany = False
 

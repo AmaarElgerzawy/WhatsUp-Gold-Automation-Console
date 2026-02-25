@@ -4,11 +4,12 @@ Reduces code duplication and makes it easy to change values globally
 """
 
 import os
+import json
 from pathlib import Path
 from datetime import timedelta
 
 # ================= DATABASE CONFIGURATION =================
-# Database connection string - can be overridden via environment variable
+# Default database connection string
 CONNECTION_STRING = (
     "Driver={ODBC Driver 18 for SQL Server};"
     "Server=localhost;"
@@ -18,6 +19,40 @@ CONNECTION_STRING = (
     "Encrypt=yes;"
     "TrustServerCertificate=yes;"
 )
+
+
+def get_connection_string():
+    """
+    Return the current database connection string.
+
+    Order of precedence:
+    1) Environment variable WUG_DB_CONNECTION_STRING
+    2) JSON file in DATA_DIR/db_connection.json
+    3) Default CONNECTION_STRING constant
+    """
+    # 1) Environment override
+    env_value = os.environ.get("WUG_DB_CONNECTION_STRING")
+    if env_value:
+        return env_value
+
+    # 2) Config file override
+    config_path = DATA_DIR / "db_connection.json"
+    if config_path.exists():
+        try:
+            raw = config_path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                value = data.get("connection_string") or data.get("value")
+            else:
+                value = str(data)
+            if value:
+                return value
+        except json.JSONDecodeError:
+            # Invalid JSON, fall back to default
+            pass
+
+    # 3) Fallback to default constant
+    return CONNECTION_STRING
 
 # ================= API & SECURITY CONFIGURATION =================
 # CORS allowed origins

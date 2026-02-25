@@ -14,7 +14,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 import pandas as pd
-from constants import CONNECTION_STRING, SMTP_SERVER, SMTP_PORT, BREVO_USERNAME, BREVO_SMTP_KEY, SENDER, RECEIVER
+from constants import get_connection_string, SMTP_SERVER, SMTP_PORT, BREVO_USERNAME, BREVO_SMTP_KEY, SENDER, RECEIVER
 
 
 # This should match your report folder from the other script
@@ -443,7 +443,7 @@ BEGIN
 END;
 """
 
-    conn = pyodbc.connect(CONNECTION_STRING)
+    conn = pyodbc.connect(get_connection_string())
     cursor = conn.cursor()
 
     cursor.execute(sql_template)
@@ -662,7 +662,7 @@ def get_device_groups():
     Returns list of (group_id, group_name) from DeviceGroup.
     Uses exactly: SELECT nDeviceGroupID, sGroupName FROM DeviceGroup;
     """
-    conn = pyodbc.connect(CONNECTION_STRING)
+    conn = pyodbc.connect(get_connection_string())
     cursor = conn.cursor()
     cursor.execute("SELECT nDeviceGroupID, sGroupName FROM DeviceGroup")
     rows = cursor.fetchall()

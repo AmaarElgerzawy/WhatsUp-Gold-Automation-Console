@@ -5,7 +5,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
-from constants import CONNECTION_STRING
+from constants import get_connection_string
 
 # ================= CONFIG =================
 
@@ -79,7 +79,7 @@ BEGIN
 END;
 """
 
-    conn = pyodbc.connect(CONNECTION_STRING)
+    conn = pyodbc.connect(get_connection_string())
     cur = conn.cursor()
     cur.execute(sql)
 

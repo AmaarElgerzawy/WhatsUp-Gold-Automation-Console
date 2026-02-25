@@ -11,6 +11,9 @@ export default function Admin() {
   const [editingUser, setEditingUser] = useState(null);
   const [availablePrivileges, setAvailablePrivileges] = useState([]);
   const [bulkTemplates, setBulkTemplates] = useState(null);
+  const [dbConnection, setDbConnection] = useState("");
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbSaving, setDbSaving] = useState(false);
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -153,6 +156,24 @@ export default function Admin() {
         const res = await apiCall("admin/bulk-templates");
         if (res.ok) {
           setBulkTemplates(await res.json());
+        }
+      } else if (activeTab === "dbConnection") {
+        try {
+          setDbLoading(true);
+          const res = await apiCall("admin/db-connection");
+          if (res.ok) {
+            const data = await res.json();
+            setDbConnection(data.connection_string || "");
+          } else {
+            console.error(
+              "Failed to load DB connection:",
+              res.status,
+              await res.text()
+            );
+            setDbConnection("");
+          }
+        } finally {
+          setDbLoading(false);
         }
       }
     } catch (e) {
@@ -366,6 +387,18 @@ export default function Admin() {
             onClick={() => setActiveTab("bulkTemplates")}
           >
             Bulk Templates
+          </button>
+          <button
+            type="button"
+            className={
+              "button button--sm" +
+              (activeTab === "dbConnection"
+                ? " button--primary"
+                : " button--ghost")
+            }
+            onClick={() => setActiveTab("dbConnection")}
+          >
+            DB Connection
           </button>
         </div>
       </div>
@@ -901,6 +934,86 @@ export default function Admin() {
             >
               💾 Save templates
             </button>
+          </div>
+        </section>
+      )}
+
+      {activeTab === "dbConnection" && (
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Database Connection</h3>
+              <p className="card-subtitle">
+                View and update the SQL Server connection string used by the
+                backend (admin only).
+              </p>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Connection string</label>
+            <textarea
+              className="input"
+              style={{ minHeight: 100, fontFamily: "monospace" }}
+              value={dbConnection}
+              onChange={(e) => setDbConnection(e.target.value)}
+            />
+            <p
+              className="card-subtitle"
+              style={{ marginTop: 4, fontSize: 11 }}
+            >
+              Changes are saved to the backend and will be used for new database
+              connections. Make sure the value is valid for your SQL Server.
+            </p>
+          </div>
+
+          <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={dbSaving}
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    "Are you sure you want to update the database connection string?"
+                  )
+                )
+                  return;
+                try {
+                  setDbSaving(true);
+                  const res = await apiCall("admin/db-connection", {
+                    method: "PUT",
+                    body: JSON.stringify({
+                      connection_string: dbConnection,
+                    }),
+                  });
+                  if (res.ok) {
+                    alert("Connection string saved successfully.");
+                  } else {
+                    const text = await res.text();
+                    alert(
+                      `Failed to save connection string: ${
+                        text || res.statusText
+                      }`
+                    );
+                  }
+                } catch (e) {
+                  alert(`Error: ${e.toString()}`);
+                } finally {
+                  setDbSaving(false);
+                }
+              }}
+            >
+              💾 Save connection
+            </button>
+            {dbLoading && (
+              <span
+                className="card-subtitle"
+                style={{ alignSelf: "center", fontSize: 12 }}
+              >
+                Loading current value...
+              </span>
+            )}
           </div>
         </section>
       )}
