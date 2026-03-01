@@ -9,6 +9,11 @@ export default function ReportSchedule() {
   const [cols, setCols] = useState([]);
   const [gridApi, setGridApi] = useState(null);
   const [newCol, setNewCol] = useState("");
+  const [showDialog, setShowDialog] = useState(false);
+  const [dialogGroup, setDialogGroup] = useState("");
+  const [dialogReportType, setDialogReportType] = useState("both"); // availability | uptime | both
+  const [dialogEvery, setDialogEvery] = useState(1);
+  const [dialogUnit, setDialogUnit] = useState("d"); // m, h, d, w
 
   useEffect(() => {
     apiCall("reports/schedule")
@@ -98,14 +103,6 @@ export default function ReportSchedule() {
 
   // ---------- ROW / COLUMN ACTIONS ----------
 
-  const addRow = () => {
-    const emptyRow = {};
-    cols.forEach((c) => {
-      if (c.field) emptyRow[c.field] = "";
-    });
-    setRows((prev) => [...prev, emptyRow]);
-  };
-
   const deleteRow = () => {
     if (!gridApi) return;
     const selected = gridApi.getSelectedNodes();
@@ -171,7 +168,7 @@ export default function ReportSchedule() {
             schedule is now stored server-side as JSON (no Excel dependency).
           </p>
         </div>
-        <span className="pill">Grid editor</span>
+        <span className="pill">Scheduler</span>
       </div>
 
       <section className="card">
@@ -184,7 +181,19 @@ export default function ReportSchedule() {
             alignItems: "center",
           }}
         >
-          <button onClick={addRow}>➕ Add Row</button>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              setDialogGroup("");
+              setDialogReportType("both");
+              setDialogEvery(1);
+              setDialogUnit("d");
+              setShowDialog(true);
+            }}
+          >
+            ➕ New schedule
+          </button>
           <button onClick={deleteRow}>➖ Delete Row</button>
 
           <input
@@ -243,6 +252,144 @@ export default function ReportSchedule() {
           </button>
         </div>
       </section>
+
+      {/* Simple dialog to add a new schedule entry */}
+      {showDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: 420,
+              maxWidth: "90vw",
+              padding: 20,
+              boxShadow: "0 10px 25px rgba(15,23,42,0.4)",
+            }}
+          >
+            <h3 className="card-title" style={{ marginBottom: 8 }}>
+              New report schedule
+            </h3>
+            <p className="card-subtitle" style={{ marginBottom: 16 }}>
+              Choose group, report type, and how often to run it. We’ll
+              generate the correct backend configuration for you.
+            </p>
+
+            <div className="form-group">
+              <label className="form-label">Group name</label>
+              <input
+                className="input"
+                placeholder="Exact group name in WhatsUp"
+                value={dialogGroup}
+                onChange={(e) => setDialogGroup(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group" style={{ marginTop: 12 }}>
+              <label className="form-label">Report type</label>
+              <select
+                className="select"
+                value={dialogReportType}
+                onChange={(e) => setDialogReportType(e.target.value)}
+              >
+                <option value="availability">Availability only</option>
+                <option value="uptime">Device Uptime only</option>
+                <option value="both">Both (Availability + Uptime)</option>
+              </select>
+            </div>
+
+            <div
+              className="form-group"
+              style={{ marginTop: 12, display: "flex", gap: 8 }}
+            >
+              <div style={{ flex: 1 }}>
+                <label className="form-label">Every</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  value={dialogEvery}
+                  onChange={(e) =>
+                    setDialogEvery(
+                      Number.isNaN(parseInt(e.target.value, 10))
+                        ? 1
+                        : Math.max(1, parseInt(e.target.value, 10))
+                    )
+                  }
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="form-label">Unit</label>
+                <select
+                  className="select"
+                  value={dialogUnit}
+                  onChange={(e) => setDialogUnit(e.target.value)}
+                >
+                  <option value="h">Hours</option>
+                  <option value="d">Days</option>
+                  <option value="w">Weeks</option>
+                </select>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 20,
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+              }}
+            >
+              <button
+                type="button"
+                className="button"
+                onClick={() => setShowDialog(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={() => {
+                  if (!dialogGroup.trim()) {
+                    alert("Please enter a group name.");
+                    return;
+                  }
+
+                  const period = `${dialogEvery}${dialogUnit}`;
+                  const base = { group: dialogGroup.trim() };
+
+                  if (
+                    dialogReportType === "availability" ||
+                    dialogReportType === "both"
+                  ) {
+                    base.availability_period = period;
+                  }
+                  if (
+                    dialogReportType === "uptime" ||
+                    dialogReportType === "both"
+                  ) {
+                    base.uptime_period = period;
+                  }
+
+                  setRows((prev) => [...prev, base]);
+                  setShowDialog(false);
+                }}
+              >
+                Add schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
