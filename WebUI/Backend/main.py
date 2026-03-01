@@ -54,6 +54,7 @@ from constants import (
     TEMPLATE_FILE,
     ROUTERS_FILE,
     REPORT_SCHEDULE_FILE,
+    REPORT_SCHEDULE_JSON_FILE,
     SCRIPTS,
     CSV_NAMES,
     ENV_WUG_ROUTERS,
@@ -1091,15 +1092,54 @@ async def _stop_report_scheduler():
 # ================= Reporting =================
 @app.get("/reports/schedule")
 def get_report_schedule(current_user: dict = Depends(get_current_user)):
+    """
+    Return the current report schedule in a JSON-friendly format.
+
+    Primary source is REPORT_SCHEDULE_JSON_FILE (no Excel dependency).
+    If that doesn't exist but a legacy Excel schedule does, we read
+    the Excel once and expose it as JSON (optionally allowing a later
+    save to migrate it).
+    """
+    # Preferred JSON-based config
+    if REPORT_SCHEDULE_JSON_FILE.exists():
+        try:
+            raw = REPORT_SCHEDULE_JSON_FILE.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            # Expecting shape: {"columns": [...], "rows": [...]}
+            columns = data.get("columns")
+            rows = data.get("rows")
+            if not columns and rows:
+                # Derive columns from keys if missing
+                columns = sorted({k for r in rows for k in r.keys()})
+            log_activity(current_user["id"], "view_report_schedule", "Viewed report schedule (JSON)", "reports")
+            return {
+                "columns": columns or [],
+                "rows": rows or [],
+            }
+        except Exception as e:
+            raise HTTPException(500, f"Failed to read JSON schedule: {e}")
+
+    # Legacy Excel-based config (read-only until saved back as JSON)
     if not REPORT_SCHEDULE_FILE.exists():
-        raise HTTPException(404, "report_schedule.xlsx not found")
+        # No schedule configured yet: return an empty grid with sensible defaults
+        log_activity(current_user["id"], "view_report_schedule", "Viewed empty report schedule", "reports")
+        default_columns = [
+            "group",
+            "availability_period",
+            "uptime_period",
+            "availability_window_start",
+            "availability_window_end",
+            "uptime_window_start",
+            "uptime_window_end",
+        ]
+        return {"columns": default_columns, "rows": []}
 
     df = pd.read_excel(REPORT_SCHEDULE_FILE)
-    log_activity(current_user["id"], "view_report_schedule", "Viewed report schedule", "reports")
+    log_activity(current_user["id"], "view_report_schedule", "Viewed report schedule (Excel legacy)", "reports")
 
     return {
         "columns": list(df.columns),
-        "rows": df.fillna("").to_dict(orient="records")
+        "rows": df.fillna("").to_dict(orient="records"),
     }
 
 @app.post("/reports/schedule")
@@ -1107,17 +1147,29 @@ def save_report_schedule(
     payload: dict,
     current_user: dict = Depends(require_privilege("manage_reports"))
 ):
-    if not REPORT_SCHEDULE_FILE.exists():
-        raise HTTPException(404, "report_schedule.xlsx not found")
+    """
+    Save the schedule as JSON (no Excel dependency).
+    Payload is expected to be: {"rows": [...]} and optionally {"columns": [...]}.
+    """
+    rows = payload.get("rows", [])
+    if not isinstance(rows, list):
+        raise HTTPException(400, "rows must be a list")
+
+    # Derive columns if not provided
+    columns = payload.get("columns")
+    if not columns and rows:
+        columns = sorted({k for r in rows for k in r.keys()})
 
     try:
-        df = pd.DataFrame(payload["rows"])
-        df.to_excel(REPORT_SCHEDULE_FILE, index=False)
+        REPORT_SCHEDULE_JSON_FILE.write_text(
+            json.dumps({"columns": columns or [], "rows": rows}, indent=2),
+            encoding="utf-8",
+        )
         log_activity(
             current_user["id"],
             "save_report_schedule",
-            f"Updated report schedule with {len(df)} entries",
-            "reports"
+            f"Updated report schedule with {len(rows)} entries (JSON)",
+            "reports",
         )
         return {"status": "saved"}
     except Exception as e:

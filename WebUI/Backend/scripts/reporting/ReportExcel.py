@@ -14,7 +14,16 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 import pandas as pd
-from constants import get_connection_string, SMTP_SERVER, SMTP_PORT, BREVO_USERNAME, BREVO_SMTP_KEY, SENDER, RECEIVER
+from constants import (
+    get_connection_string,
+    SMTP_SERVER,
+    SMTP_PORT,
+    BREVO_USERNAME,
+    BREVO_SMTP_KEY,
+    SENDER,
+    RECEIVER,
+    REPORT_SCHEDULE_JSON_FILE,
+)
 try:
     # When imported as part of the FastAPI app (scripts.reporting package)
     from scripts.reporting.DeviceUpTimeReport import run_sp_group_device_uptime, write_excel as write_uptime_excel
@@ -25,6 +34,9 @@ except ImportError:
 
 # This should match your report folder from the other script
 OUTPUT_FOLDER = r"C:\WUG_Exports"
+# Preferred JSON-based schedule shared with the FastAPI API
+SCHEDULE_JSON_FILE = str(REPORT_SCHEDULE_JSON_FILE)
+# Legacy Excel config (kept as a fallback for migration)
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "report_schedule.xlsx")
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state.json")
 # =================================
@@ -137,7 +149,18 @@ def save_state(state):
     with open(STATE_FILE, "w") as f:
         json.dump(state, f)
 
-def parse_period(period):
+def parse_period(period: str) -> timedelta:
+    """
+    Parse a simple duration string like:
+      "1d" (days), "2w" (weeks), "6h" (hours), "30m" (minutes)
+    Used both for:
+      - schedule intervals (how often to run)
+      - window offsets (relative to run time) when negative values are used.
+    """
+    period = str(period).strip()
+    if not period:
+        raise ValueError("Empty period")
+
     num = int(period[:-1])
     unit = period[-1]
 
@@ -159,12 +182,36 @@ def load_schedule_config():
     Supported layouts:
     - Legacy:
         columns: ["group", "period"]
-        → both reports (availability + uptime) use the same period
+        → both reports (availability + uptime) use the same period and a simple rolling window
     - New (per‑report control from the frontend grid):
         columns: ["group", "availability_period", "uptime_period"]
         (column names are case‑insensitive; "availability" / "uptime" also work)
+
+        Optional window columns per report type:
+        - availability_window_start, availability_window_end
+        - uptime_window_start, uptime_window_end
+
+        Window values are parsed like periods (e.g. "-73h", "-25h").
+        They are interpreted as offsets relative to the run time:
+          start = now + parse_period(window_start)
+          end   = now + parse_period(window_end)
+        If window_* are missing, we fall back to a rolling window:
+          [now - period, now]
     """
-    df = pd.read_excel(CONFIG_FILE)
+    # Preferred JSON config if present
+    if os.path.exists(SCHEDULE_JSON_FILE):
+        with open(SCHEDULE_JSON_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        rows = raw.get("rows", [])
+        if rows:
+            df = pd.DataFrame(rows)
+        else:
+            df = pd.DataFrame()
+    else:
+        # Fallback to legacy Excel (if still present)
+        if not os.path.exists(CONFIG_FILE):
+            return {}
+        df = pd.read_excel(CONFIG_FILE)
     schedule = {}
 
     # Normalize column name lookups
@@ -175,6 +222,11 @@ def load_schedule_config():
 
     avail_col = col_map.get("availability_period") or col_map.get("availability")
     uptime_col = col_map.get("uptime_period") or col_map.get("uptime")
+
+    avail_win_start_col = col_map.get("availability_window_start")
+    avail_win_end_col = col_map.get("availability_window_end")
+    uptime_win_start_col = col_map.get("uptime_window_start")
+    uptime_win_end_col = col_map.get("uptime_window_end")
     legacy_period_col = col_map.get("period")
 
     for _, row in df.iterrows():
@@ -193,6 +245,28 @@ def load_schedule_config():
             raw = row[uptime_col]
             if pd.notna(raw) and str(raw).strip():
                 entry["uptime_period"] = str(raw).strip()
+
+        # Optional explicit windows for availability
+        if avail_win_start_col is not None:
+            raw = row[avail_win_start_col]
+            if pd.notna(raw) and str(raw).strip():
+                entry["availability_window_start"] = str(raw).strip()
+
+        if avail_win_end_col is not None:
+            raw = row[avail_win_end_col]
+            if pd.notna(raw) and str(raw).strip():
+                entry["availability_window_end"] = str(raw).strip()
+
+        # Optional explicit windows for uptime
+        if uptime_win_start_col is not None:
+            raw = row[uptime_win_start_col]
+            if pd.notna(raw) and str(raw).strip():
+                entry["uptime_window_start"] = str(raw).strip()
+
+        if uptime_win_end_col is not None:
+            raw = row[uptime_win_end_col]
+            if pd.notna(raw) and str(raw).strip():
+                entry["uptime_window_end"] = str(raw).strip()
 
         # Legacy fallback: single "period" column drives both reports
         if not entry and legacy_period_col is not None:
@@ -810,27 +884,43 @@ def run_scheduled_reports():
                 last_run_str = state.get(state_key)
 
                 if should_run(last_run_str, period_td):
-                    start_date, end_date = get_date_range_from_period(period_td)
-                    device_group_id = name_to_id[group_name_stripped]
-                    print(f"[RUN] Availability for {group_name_stripped}: {start_date} -> {end_date}")
-                    try:
-                        availability_report_path = write_excel_for_group(
-                            device_group_id=device_group_id,
-                            start_date=start_date,
-                            end_date=end_date,
-                            group_name=group_name_stripped,
-                        )
+                    now_run = datetime.now()
+                    win_start_raw = periods.get("availability_window_start")
+                    win_end_raw = periods.get("availability_window_end")
 
-                        send_single_report_email(
-                            group_name=group_name_stripped,
-                            report_path=availability_report_path,
-                            start_date=start_date,
-                            end_date=end_date,
-                        )
+                    if win_start_raw and win_end_raw:
+                        try:
+                            start_date = now_run + parse_period(win_start_raw)
+                            end_date = now_run + parse_period(win_end_raw)
+                        except Exception as e:
+                            print(f"[SKIP] Invalid availability window for '{group_name_stripped}': {e}")
+                            start_date = None
+                            end_date = None
+                    else:
+                        # Default rolling window
+                        start_date, end_date = get_date_range_from_period(period_td)
 
-                        state[state_key] = datetime.now().replace(minute=0, second=0, microsecond=0).isoformat()
-                    except Exception as e:
-                        print(f"[ERROR] while generating availability report for '{group_name_stripped}': {e}")
+                    if start_date and end_date and start_date < end_date:
+                        device_group_id = name_to_id[group_name_stripped]
+                        print(f"[RUN] Availability for {group_name_stripped}: {start_date} -> {end_date}")
+                        try:
+                            availability_report_path = write_excel_for_group(
+                                device_group_id=device_group_id,
+                                start_date=start_date,
+                                end_date=end_date,
+                                group_name=group_name_stripped,
+                            )
+
+                            send_single_report_email(
+                                group_name=group_name_stripped,
+                                report_path=availability_report_path,
+                                start_date=start_date,
+                                end_date=end_date,
+                            )
+
+                            state[state_key] = now_run.replace(minute=0, second=0, microsecond=0).isoformat()
+                        except Exception as e:
+                            print(f"[ERROR] while generating availability report for '{group_name_stripped}': {e}")
 
         # ===== Report 2: Device Uptime (DeviceUpTimeReport) =====
         uptime_period = periods.get("uptime_period")
@@ -844,36 +934,52 @@ def run_scheduled_reports():
                 last_run_str = state.get(state_key)
 
                 if should_run(last_run_str, period_td):
-                    start_date, end_date = get_date_range_from_period(period_td)
-                    device_group_id = name_to_id[group_name_stripped]
-                    print(f"[RUN] DeviceUpTime for {group_name_stripped}: {start_date} -> {end_date}")
-                    try:
-                        uptime_rows = run_sp_group_device_uptime(
-                            device_group_id=device_group_id,
-                            start_date=start_date,
-                            end_date=end_date,
-                        )
+                    now_run = datetime.now()
+                    win_start_raw = periods.get("uptime_window_start")
+                    win_end_raw = periods.get("uptime_window_end")
 
-                        if uptime_rows:
-                            uptime_report_path = write_uptime_excel(
-                                group_name_stripped,
-                                uptime_rows,
-                                start_date,
-                                end_date,
-                            )
+                    if win_start_raw and win_end_raw:
+                        try:
+                            start_date = now_run + parse_period(win_start_raw)
+                            end_date = now_run + parse_period(win_end_raw)
+                        except Exception as e:
+                            print(f"[SKIP] Invalid uptime window for '{group_name_stripped}': {e}")
+                            start_date = None
+                            end_date = None
+                    else:
+                        # Default rolling window
+                        start_date, end_date = get_date_range_from_period(period_td)
 
-                            send_single_report_email(
-                                group_name=group_name_stripped,
-                                report_path=uptime_report_path,
+                    if start_date and end_date and start_date < end_date:
+                        device_group_id = name_to_id[group_name_stripped]
+                        print(f"[RUN] DeviceUpTime for {group_name_stripped}: {start_date} -> {end_date}")
+                        try:
+                            uptime_rows = run_sp_group_device_uptime(
+                                device_group_id=device_group_id,
                                 start_date=start_date,
                                 end_date=end_date,
                             )
-                        else:
-                            print(f"[RUN] No uptime data for '{group_name_stripped}' in scheduled window")
 
-                        state[state_key] = datetime.now().replace(minute=0, second=0, microsecond=0).isoformat()
-                    except Exception as e:
-                        print(f"[ERROR] while generating DeviceUpTime report for '{group_name_stripped}': {e}")
+                            if uptime_rows:
+                                uptime_report_path = write_uptime_excel(
+                                    group_name_stripped,
+                                    uptime_rows,
+                                    start_date,
+                                    end_date,
+                                )
+
+                                send_single_report_email(
+                                    group_name=group_name_stripped,
+                                    report_path=uptime_report_path,
+                                    start_date=start_date,
+                                    end_date=end_date,
+                                )
+                            else:
+                                print(f"[RUN] No uptime data for '{group_name_stripped}' in scheduled window")
+
+                            state[state_key] = now_run.replace(minute=0, second=0, microsecond=0).isoformat()
+                        except Exception as e:
+                            print(f"[ERROR] while generating DeviceUpTime report for '{group_name_stripped}': {e}")
 
     # 5) Save updated state
     save_state(state)

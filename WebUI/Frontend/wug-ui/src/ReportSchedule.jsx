@@ -19,6 +19,59 @@ export default function ReportSchedule() {
         return res.json();
       })
       .then((data) => {
+        // Known core scheduling fields in preferred order
+        const coreFields = [
+          "group",
+          "availability_period",
+          "availability_window_start",
+          "availability_window_end",
+          "uptime_period",
+          "uptime_window_start",
+          "uptime_window_end",
+        ];
+
+        // Columns returned from backend (JSON schedule or legacy)
+        const backendColumns = Array.isArray(data.columns) ? data.columns : [];
+
+        // Merge: ensure all core fields exist first, then any extra columns
+        const mergedFields = Array.from(
+          new Set([...coreFields, ...backendColumns])
+        );
+
+        const columnFromField = (field) => {
+          if (!field) return null;
+
+          // Nicely formatted header titles for known fields
+          const niceHeader = (() => {
+            switch (field) {
+              case "group":
+                return "Group name";
+              case "availability_period":
+                return "Availability period (e.g. 1d, 1w)";
+              case "availability_window_start":
+                return "Availability window start offset";
+              case "availability_window_end":
+                return "Availability window end offset";
+              case "uptime_period":
+                return "Uptime period (e.g. 1d, 1w)";
+              case "uptime_window_start":
+                return "Uptime window start offset";
+              case "uptime_window_end":
+                return "Uptime window end offset";
+              default:
+                return field;
+            }
+          })();
+
+          return {
+            headerName: niceHeader,
+            field,
+            editable: true,
+            minWidth: 160,
+            cellClass: "excel-cell",
+          };
+        };
+
         const columnDefs = [
           {
             headerName: "",
@@ -29,13 +82,9 @@ export default function ReportSchedule() {
             headerClass: "excel-row-number-header",
             suppressMenu: true,
           },
-          ...data.columns.map((c) => ({
-            headerName: c,
-            field: c,
-            editable: true,
-            minWidth: 120,
-            cellClass: "excel-cell",
-          })),
+          ...mergedFields
+            .map((field) => columnFromField(field))
+            .filter(Boolean),
         ];
 
         setRows(data.rows);
@@ -95,9 +144,18 @@ export default function ReportSchedule() {
     const updated = [];
     gridApi.forEachNode((n) => updated.push(n.data));
 
+    // Persist both rows and the active column fields so the backend
+    // can round‑trip additional / custom columns.
+    const columnFields = cols
+      .filter((c) => c.field)
+      .map((c) => c.field);
+
     await apiCall("reports/schedule", {
       method: "POST",
-      body: JSON.stringify({ rows: updated }),
+      body: JSON.stringify({
+        columns: columnFields,
+        rows: updated,
+      }),
     });
 
     alert("Saved successfully");
@@ -109,7 +167,8 @@ export default function ReportSchedule() {
         <div>
           <h2 className="app-main-title">Report schedule</h2>
           <p className="app-main-subtitle">
-            Manage when and how reports are generated and delivered.
+            Manage when and how reports are generated and delivered. This
+            schedule is now stored server-side as JSON (no Excel dependency).
           </p>
         </div>
         <span className="pill">Grid editor</span>
