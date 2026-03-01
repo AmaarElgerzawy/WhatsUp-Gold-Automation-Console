@@ -1,0 +1,23 @@
+{
+  "add": [
+    "DisplayName",
+    "DeviceType",
+    "DeviceGroup",
+    "NetworkAddress",
+    "NetworkName",
+    "SomeData"
+  ],
+  "update": [
+    "sDisplayName",
+    "sGroupName",
+    "DeviceType",
+    "NewDeviceGroup",
+    "NetworkAddress",
+    "NetworkName",
+    "Notes"
+  ],
+  "delete": [
+    "sDisplayName",
+    "sNetworkAddress"
+  ]
+}

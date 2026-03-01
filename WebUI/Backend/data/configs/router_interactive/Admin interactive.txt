@@ -1,0 +1,1 @@
+"[\r\n  {\r\n    \"type\": \"exec\",\r\n    \"command\": \"sh ip route\"\r\n  }\r\n]"

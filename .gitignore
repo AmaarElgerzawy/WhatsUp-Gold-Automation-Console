@@ -60,7 +60,6 @@ htmlcov/
 *.sublime-workspace
 
 # Project specific
-WebUI/Backend/data/
 WebUI/Backend/__pycache__/
 *.pyc
 *.pyo

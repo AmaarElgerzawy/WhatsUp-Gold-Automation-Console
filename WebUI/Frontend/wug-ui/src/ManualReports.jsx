@@ -105,7 +105,7 @@ export default function ManualReports() {
                 <input
                   className="input input--clean"
                   value={start}
-                  type="date"
+                  type="datetime-local"
                   onChange={(e) => setStart(e.target.value)}
                 />
               </div>
@@ -116,9 +116,9 @@ export default function ManualReports() {
               <div className="date-box">
                 <input
                   className="input input--clean"
-                  placeholder="YYYY-MM-DD"
+                  placeholder="YYYY-MM-DDTHH:mm"
                   value={end}
-                  type="date"
+                  type="datetime-local"
                   onChange={(e) => setEnd(e.target.value)}
                 />
               </div>

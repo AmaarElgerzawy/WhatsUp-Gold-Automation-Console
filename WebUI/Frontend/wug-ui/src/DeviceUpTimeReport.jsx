@@ -102,25 +102,25 @@ export default function DeviceUpTimeReport() {
           </div>
           <div className="from-group">
             <div className="form-group">
-              <label className="form-label">Start Date</label>
+              <label className="form-label">Start Date & Time</label>
               <div className="date-box">
                 <input
                   className="input input--clean"
                   value={start}
-                  type="date"
+                  type="datetime-local"
                   onChange={(e) => setStart(e.target.value)}
                 />
               </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">End Date</label>
+              <label className="form-label">End Date & Time</label>
               <div className="date-box">
                 <input
                   className="input input--clean"
-                  placeholder="YYYY-MM-DD"
+                  placeholder="YYYY-MM-DDTHH:mm"
                   value={end}
-                  type="date"
+                  type="datetime-local"
                   onChange={(e) => setEnd(e.target.value)}
                 />
               </div>

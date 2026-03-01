@@ -1,0 +1,12 @@
+﻿DisplayName,NetworkAddress,DeviceGroup,DeviceType,Notes,NetworkName
+Test-1,10.0.0.1,158,7,online,Cairooo-1
+Test-2,10.0.0.2,158,7,online,Cairooo-2
+Test-3,10.0.0.3,158,7,online,Cairooo-3
+Test-4,10.0.0.4,158,7,online,Cairooo-4
+Test-5,10.0.0.5,158,8,online,Cairooo-5
+Test-6,10.0.0.6,158,8,online,Cairooo-6
+Test-7,10.0.0.7,158,8,online,Cairooo-7
+Test-8,10.0.0.8,158,8,online,Cairooo-8
+Test-9,10.0.0.9,158,9,online,Cairooo-9
+Test-10,10.0.0.10,158,9,online,Cairooo-10
+Test-11,10.0.0.11,158,9,test,Cairooo-11
