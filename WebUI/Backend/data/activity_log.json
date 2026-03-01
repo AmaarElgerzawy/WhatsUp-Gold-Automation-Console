@@ -1,100 +1,23 @@
 [
   {
-    "timestamp": "2026-02-03T16:20:29.192490",
-    "user_id": "admin",
-    "action": "view_backup_routers",
-    "details": "Viewed backup routers list",
-    "page": "backups"
-  },
-  {
-    "timestamp": "2026-02-03T16:20:29.947474",
+    "timestamp": "2026-03-02T00:38:00.897998",
     "user_id": "admin",
     "action": "view_report_schedule",
     "details": "Viewed report schedule",
     "page": "reports"
   },
   {
-    "timestamp": "2026-02-03T16:20:29.967794",
+    "timestamp": "2026-03-02T00:38:00.927026",
     "user_id": "admin",
     "action": "view_report_schedule",
     "details": "Viewed report schedule",
     "page": "reports"
   },
   {
-    "timestamp": "2026-02-03T16:20:30.013877",
+    "timestamp": "2026-03-02T00:38:00.971928",
     "user_id": "admin",
     "action": "view_report_schedule",
     "details": "Viewed report schedule",
     "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-03T16:21:45.516131",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-03T16:21:45.537825",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-03T16:21:45.564058",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-03T16:21:45.604013",
-    "user_id": "admin",
-    "action": "list_report_groups",
-    "details": "Viewed device groups for reports",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-03T16:21:45.620336",
-    "user_id": "admin",
-    "action": "list_report_groups",
-    "details": "Viewed device groups for reports",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-03T16:21:45.638134",
-    "user_id": "admin",
-    "action": "list_report_groups",
-    "details": "Viewed device groups for reports",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-03T16:21:45.656533",
-    "user_id": "admin",
-    "action": "list_report_groups",
-    "details": "Viewed device groups for reports",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-02-25T02:41:38.095426",
-    "user_id": "admin",
-    "action": "login",
-    "details": "User admin logged in",
-    "page": "login"
-  },
-  {
-    "timestamp": "2026-02-25T02:41:41.616435",
-    "user_id": "admin",
-    "action": "list_users",
-    "details": "Viewed user list",
-    "page": "admin"
-  },
-  {
-    "timestamp": "2026-02-25T02:41:41.638740",
-    "user_id": "admin",
-    "action": "list_users",
-    "details": "Viewed user list",
-    "page": "admin"
   }
 ]

@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import pyodbc
 import os
+import asyncio
 from pathlib import Path
 from datetime import datetime, timedelta
 import shutil
@@ -87,7 +88,7 @@ from constants import (
     get_connection_string,
 )
 
-from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group
+from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group, run_scheduled_reports
 from scripts.reporting.DeviceUpTimeReport import run_sp_group_device_uptime, write_excel
 
 # ================= INITIALIZATION =================
@@ -1038,6 +1039,55 @@ def save_backup_routers(
         "backups"
     )
     return {"status": "ok"}
+
+# ================= Scheduled Report Runner =================
+# Controls for the background scheduler that executes due reports.
+REPORT_SCHEDULER_ENABLED = os.environ.get("WUG_REPORT_SCHEDULER_ENABLED", "true").lower() == "true"
+REPORT_SCHEDULER_INTERVAL_SECONDS = int(os.environ.get("WUG_REPORT_SCHEDULER_INTERVAL_SECONDS", "300"))
+
+_report_scheduler_task = None
+
+
+async def _report_scheduler_loop():
+    """
+    Background loop that periodically invokes run_scheduled_reports().
+    This uses asyncio.to_thread so the FastAPI event loop stays responsive.
+    """
+    while True:
+        try:
+            await asyncio.to_thread(run_scheduled_reports)
+        except Exception as e:
+            # Basic logging to stderr; avoids needing a request-scoped user.
+            print(f"[REPORT SCHEDULER] Error while running scheduled reports: {e}")
+        await asyncio.sleep(REPORT_SCHEDULER_INTERVAL_SECONDS)
+
+
+@app.on_event("startup")
+async def _start_report_scheduler():
+    global _report_scheduler_task
+
+    if not REPORT_SCHEDULER_ENABLED:
+        print("[REPORT SCHEDULER] Disabled via WUG_REPORT_SCHEDULER_ENABLED")
+        return
+
+    _report_scheduler_task = asyncio.create_task(_report_scheduler_loop())
+    print(f"[REPORT SCHEDULER] Started (interval={REPORT_SCHEDULER_INTERVAL_SECONDS}s)")
+
+
+@app.on_event("shutdown")
+async def _stop_report_scheduler():
+    global _report_scheduler_task
+
+    if _report_scheduler_task is None:
+        return
+
+    _report_scheduler_task.cancel()
+    try:
+        await _report_scheduler_task
+    except asyncio.CancelledError:
+        pass
+    _report_scheduler_task = None
+    print("[REPORT SCHEDULER] Stopped")
 # ================= Reporting =================
 @app.get("/reports/schedule")
 def get_report_schedule(current_user: dict = Depends(get_current_user)):
