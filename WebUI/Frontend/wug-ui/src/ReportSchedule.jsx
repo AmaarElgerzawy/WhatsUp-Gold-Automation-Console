@@ -381,15 +381,16 @@ export default function ReportSchedule() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <label className="form-label">Unit</label>
-                    <select
-                      className="select"
-                      value={dialogUnit}
-                      onChange={(e) => setDialogUnit(e.target.value)}
-                    >
-                      <option value="h">Hours</option>
-                      <option value="d">Days</option>
-                      <option value="w">Weeks</option>
-                    </select>
+                  <select
+                    className="select"
+                    value={dialogUnit}
+                    onChange={(e) => setDialogUnit(e.target.value)}
+                  >
+                    <option value="m">Minutes</option>
+                    <option value="h">Hours</option>
+                    <option value="d">Days</option>
+                    <option value="w">Weeks</option>
+                  </select>
                   </div>
                 </div>
 
@@ -408,6 +409,9 @@ export default function ReportSchedule() {
                     <option value="last_24h">Last 24 hours</option>
                     <option value="last_7d">Last 7 days</option>
                     <option value="last_30d">Last 30 days</option>
+                    <option value="full_last_month">
+                      Full last month (1st to last day)
+                    </option>
                   </select>
                 </div>
               </div>
@@ -564,6 +568,9 @@ export default function ReportSchedule() {
                     } else if (simpleWindowPreset === "last_30d") {
                       winStart = "-30d";
                       winEnd = "0h";
+                    } else if (simpleWindowPreset === "full_last_month") {
+                      winStart = "full_last_month";
+                      winEnd = "full_last_month";
                     }
 
                     if (winStart && winEnd) {

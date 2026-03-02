@@ -889,31 +889,34 @@ def run_scheduled_reports():
                     win_end_raw = periods.get("availability_window_end")
 
                     if win_start_raw and win_end_raw:
-                        try:
-                            win_start_td = parse_period(win_start_raw)
-                            win_end_td = parse_period(win_end_raw)
+                        win_start_str = str(win_start_raw).strip()
+                        win_end_str = str(win_end_raw).strip()
+                        if win_start_str == "full_last_month" and win_end_str == "full_last_month":
+                            start_date, end_date = get_previous_month_range()
+                        else:
+                            try:
+                                win_start_td = parse_period(win_start_raw)
+                                win_end_td = parse_period(win_end_raw)
 
-                            adj_start_td = win_start_td
-                            adj_end_td = win_end_td
+                                adj_start_td = win_start_td
+                                adj_end_td = win_end_td
 
-                            # If both offsets are non‑negative and the period is at least a week,
-                            # interpret them as offsets *inside the previous period*.
-                            # This matches weekly report configs like "last week Mon 10:00 → Fri 10:00"
-                            # that were authored relative to the run time.
-                            if (
-                                win_start_td >= timedelta(0)
-                                and win_end_td >= timedelta(0)
-                                and period_td >= timedelta(days=7)
-                            ):
-                                adj_start_td = win_start_td - period_td
-                                adj_end_td = win_end_td - period_td
+                                # If both offsets are non‑negative and the period is at least a week,
+                                # interpret them as offsets *inside the previous period*.
+                                if (
+                                    win_start_td >= timedelta(0)
+                                    and win_end_td >= timedelta(0)
+                                    and period_td >= timedelta(days=7)
+                                ):
+                                    adj_start_td = win_start_td - period_td
+                                    adj_end_td = win_end_td - period_td
 
-                            start_date = now_run + adj_start_td
-                            end_date = now_run + adj_end_td
-                        except Exception as e:
-                            print(f"[SKIP] Invalid availability window for '{group_name_stripped}': {e}")
-                            start_date = None
-                            end_date = None
+                                start_date = now_run + adj_start_td
+                                end_date = now_run + adj_end_td
+                            except Exception as e:
+                                print(f"[SKIP] Invalid availability window for '{group_name_stripped}': {e}")
+                                start_date = None
+                                end_date = None
                     else:
                         # Default rolling window
                         start_date, end_date = get_date_range_from_period(period_td)
@@ -957,28 +960,33 @@ def run_scheduled_reports():
                     win_end_raw = periods.get("uptime_window_end")
 
                     if win_start_raw and win_end_raw:
-                        try:
-                            win_start_td = parse_period(win_start_raw)
-                            win_end_td = parse_period(win_end_raw)
+                        win_start_str = str(win_start_raw).strip()
+                        win_end_str = str(win_end_raw).strip()
+                        if win_start_str == "full_last_month" and win_end_str == "full_last_month":
+                            start_date, end_date = get_previous_month_range()
+                        else:
+                            try:
+                                win_start_td = parse_period(win_start_raw)
+                                win_end_td = parse_period(win_end_raw)
 
-                            adj_start_td = win_start_td
-                            adj_end_td = win_end_td
+                                adj_start_td = win_start_td
+                                adj_end_td = win_end_td
 
-                            # Same weekly semantics as availability windows.
-                            if (
-                                win_start_td >= timedelta(0)
-                                and win_end_td >= timedelta(0)
-                                and period_td >= timedelta(days=7)
-                            ):
-                                adj_start_td = win_start_td - period_td
-                                adj_end_td = win_end_td - period_td
+                                # Same weekly semantics as availability windows.
+                                if (
+                                    win_start_td >= timedelta(0)
+                                    and win_end_td >= timedelta(0)
+                                    and period_td >= timedelta(days=7)
+                                ):
+                                    adj_start_td = win_start_td - period_td
+                                    adj_end_td = win_end_td - period_td
 
-                            start_date = now_run + adj_start_td
-                            end_date = now_run + adj_end_td
-                        except Exception as e:
-                            print(f"[SKIP] Invalid uptime window for '{group_name_stripped}': {e}")
-                            start_date = None
-                            end_date = None
+                                start_date = now_run + adj_start_td
+                                end_date = now_run + adj_end_td
+                            except Exception as e:
+                                print(f"[SKIP] Invalid uptime window for '{group_name_stripped}': {e}")
+                                start_date = None
+                                end_date = None
                     else:
                         # Default rolling window
                         start_date, end_date = get_date_range_from_period(period_td)
@@ -1007,12 +1015,13 @@ def run_scheduled_reports():
                                     start_date=start_date,
                                     end_date=end_date,
                                 )
+                                state[state_key] = now_run.replace(minute=0, second=0, microsecond=0).isoformat()
                             else:
-                                print(f"[RUN] No uptime data for '{group_name_stripped}' in scheduled window")
-
-                            state[state_key] = now_run.replace(minute=0, second=0, microsecond=0).isoformat()
+                                print(f"[RUN] No uptime data for '{group_name_stripped}' in scheduled window (will retry next run)")
+                                # Do not update state so the job runs again next period
                         except Exception as e:
                             print(f"[ERROR] while generating DeviceUpTime report for '{group_name_stripped}': {e}")
+                            # Do not update state on error so it retries
 
     # 5) Save updated state
     save_state(state)
