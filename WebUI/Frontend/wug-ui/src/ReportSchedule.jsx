@@ -15,6 +15,7 @@ export default function ReportSchedule() {
   const [dialogReportType, setDialogReportType] = useState("both"); // availability | uptime | both
   const [dialogEvery, setDialogEvery] = useState(1);
   const [dialogUnit, setDialogUnit] = useState("d"); // m, h, d, w
+  const [simpleWindowPreset, setSimpleWindowPreset] = useState("match"); // match | last_24h | last_7d | last_30d
   const [runDay, setRunDay] = useState("mon");
   const [runTime, setRunTime] = useState("10:00");
   const [windowFromDay, setWindowFromDay] = useState("fri");
@@ -196,6 +197,7 @@ export default function ReportSchedule() {
               setDialogReportType("both");
               setDialogEvery(1);
               setDialogUnit("d");
+              setSimpleWindowPreset("match");
               setDialogMode("simple");
               setRunDay("mon");
               setRunTime("10:00");
@@ -353,34 +355,59 @@ export default function ReportSchedule() {
             {dialogMode === "simple" && (
               <div
                 className="form-group"
-                style={{ marginTop: 12, display: "flex", gap: 8 }}
+                style={{
+                  marginTop: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
               >
-                <div style={{ flex: 1 }}>
-                  <label className="form-label">Every</label>
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    value={dialogEvery}
-                    onChange={(e) =>
-                      setDialogEvery(
-                        Number.isNaN(parseInt(e.target.value, 10))
-                          ? 1
-                          : Math.max(1, parseInt(e.target.value, 10))
-                      )
-                    }
-                  />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Every</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={1}
+                      value={dialogEvery}
+                      onChange={(e) =>
+                        setDialogEvery(
+                          Number.isNaN(parseInt(e.target.value, 10))
+                            ? 1
+                            : Math.max(1, parseInt(e.target.value, 10))
+                        )
+                      }
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Unit</label>
+                    <select
+                      className="select"
+                      value={dialogUnit}
+                      onChange={(e) => setDialogUnit(e.target.value)}
+                    >
+                      <option value="h">Hours</option>
+                      <option value="d">Days</option>
+                      <option value="w">Weeks</option>
+                    </select>
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label">Unit</label>
+
+                <div>
+                  <label className="form-label">
+                    Report period (data window)
+                  </label>
                   <select
                     className="select"
-                    value={dialogUnit}
-                    onChange={(e) => setDialogUnit(e.target.value)}
+                    value={simpleWindowPreset}
+                    onChange={(e) => setSimpleWindowPreset(e.target.value)}
                   >
-                    <option value="h">Hours</option>
-                    <option value="d">Days</option>
-                    <option value="w">Weeks</option>
+                    <option value="match">
+                      Match schedule interval (rolling window)
+                    </option>
+                    <option value="last_24h">Last 24 hours</option>
+                    <option value="last_7d">Last 7 days</option>
+                    <option value="last_30d">Last 30 days</option>
                   </select>
                 </div>
               </div>
@@ -523,6 +550,37 @@ export default function ReportSchedule() {
                       dialogReportType === "both"
                     ) {
                       base.uptime_period = period;
+                    }
+
+                    // Optional explicit data window for simple interval
+                    let winStart = null;
+                    let winEnd = null;
+                    if (simpleWindowPreset === "last_24h") {
+                      winStart = "-24h";
+                      winEnd = "0h";
+                    } else if (simpleWindowPreset === "last_7d") {
+                      winStart = "-7d";
+                      winEnd = "0h";
+                    } else if (simpleWindowPreset === "last_30d") {
+                      winStart = "-30d";
+                      winEnd = "0h";
+                    }
+
+                    if (winStart && winEnd) {
+                      if (
+                        dialogReportType === "availability" ||
+                        dialogReportType === "both"
+                      ) {
+                        base.availability_window_start = winStart;
+                        base.availability_window_end = winEnd;
+                      }
+                      if (
+                        dialogReportType === "uptime" ||
+                        dialogReportType === "both"
+                      ) {
+                        base.uptime_window_start = winStart;
+                        base.uptime_window_end = winEnd;
+                      }
                     }
                   } else if (dialogMode === "weeklyWindow") {
                     // Helper to map day -> index (Mon=0)
