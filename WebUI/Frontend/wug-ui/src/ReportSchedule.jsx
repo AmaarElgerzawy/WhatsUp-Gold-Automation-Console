@@ -10,10 +10,17 @@ export default function ReportSchedule() {
   const [gridApi, setGridApi] = useState(null);
   const [newCol, setNewCol] = useState("");
   const [showDialog, setShowDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState("simple"); // simple | weeklyWindow
   const [dialogGroup, setDialogGroup] = useState("");
   const [dialogReportType, setDialogReportType] = useState("both"); // availability | uptime | both
   const [dialogEvery, setDialogEvery] = useState(1);
   const [dialogUnit, setDialogUnit] = useState("d"); // m, h, d, w
+  const [runDay, setRunDay] = useState("mon");
+  const [runTime, setRunTime] = useState("10:00");
+  const [windowFromDay, setWindowFromDay] = useState("mon");
+  const [windowFromTime, setWindowFromTime] = useState("10:00");
+  const [windowToDay, setWindowToDay] = useState("fri");
+  const [windowToTime, setWindowToTime] = useState("10:00");
 
   useEffect(() => {
     apiCall("reports/schedule")
@@ -189,6 +196,13 @@ export default function ReportSchedule() {
               setDialogReportType("both");
               setDialogEvery(1);
               setDialogUnit("d");
+              setDialogMode("simple");
+              setRunDay("mon");
+              setRunTime("10:00");
+              setWindowFromDay("mon");
+              setWindowFromTime("10:00");
+              setWindowToDay("fri");
+              setWindowToTime("10:00");
               setShowDialog(true);
             }}
           >
@@ -279,9 +293,39 @@ export default function ReportSchedule() {
               New report schedule
             </h3>
             <p className="card-subtitle" style={{ marginBottom: 16 }}>
-              Choose group, report type, and how often to run it. We’ll
-              generate the correct backend configuration for you.
+              Choose group, report type, and either a simple interval or an
+              exact weekly window (e.g. Monday 10:00 to Friday 10:00).
             </p>
+
+            {/* Mode toggle */}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              <button
+                type="button"
+                className={
+                  "button" +
+                  (dialogMode === "simple" ? " button--primary" : "")
+                }
+                onClick={() => setDialogMode("simple")}
+              >
+                Simple interval
+              </button>
+              <button
+                type="button"
+                className={
+                  "button" +
+                  (dialogMode === "weeklyWindow" ? " button--primary" : "")
+                }
+                onClick={() => setDialogMode("weeklyWindow")}
+              >
+                Weekly window
+              </button>
+            </div>
 
             <div className="form-group">
               <label className="form-label">Group name</label>
@@ -306,39 +350,138 @@ export default function ReportSchedule() {
               </select>
             </div>
 
-            <div
-              className="form-group"
-              style={{ marginTop: 12, display: "flex", gap: 8 }}
-            >
-              <div style={{ flex: 1 }}>
-                <label className="form-label">Every</label>
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  value={dialogEvery}
-                  onChange={(e) =>
-                    setDialogEvery(
-                      Number.isNaN(parseInt(e.target.value, 10))
-                        ? 1
-                        : Math.max(1, parseInt(e.target.value, 10))
-                    )
-                  }
-                />
+            {dialogMode === "simple" && (
+              <div
+                className="form-group"
+                style={{ marginTop: 12, display: "flex", gap: 8 }}
+              >
+                <div style={{ flex: 1 }}>
+                  <label className="form-label">Every</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={dialogEvery}
+                    onChange={(e) =>
+                      setDialogEvery(
+                        Number.isNaN(parseInt(e.target.value, 10))
+                          ? 1
+                          : Math.max(1, parseInt(e.target.value, 10))
+                      )
+                    }
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="form-label">Unit</label>
+                  <select
+                    className="select"
+                    value={dialogUnit}
+                    onChange={(e) => setDialogUnit(e.target.value)}
+                  >
+                    <option value="h">Hours</option>
+                    <option value="d">Days</option>
+                    <option value="w">Weeks</option>
+                  </select>
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <label className="form-label">Unit</label>
-                <select
-                  className="select"
-                  value={dialogUnit}
-                  onChange={(e) => setDialogUnit(e.target.value)}
+            )}
+
+            {dialogMode === "weeklyWindow" && (
+              <div style={{ marginTop: 12 }}>
+                <div
+                  className="form-group"
+                  style={{ display: "flex", gap: 8, marginBottom: 8 }}
                 >
-                  <option value="h">Hours</option>
-                  <option value="d">Days</option>
-                  <option value="w">Weeks</option>
-                </select>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Run on (day)</label>
+                    <select
+                      className="select"
+                      value={runDay}
+                      onChange={(e) => setRunDay(e.target.value)}
+                    >
+                      <option value="mon">Monday</option>
+                      <option value="tue">Tuesday</option>
+                      <option value="wed">Wednesday</option>
+                      <option value="thu">Thursday</option>
+                      <option value="fri">Friday</option>
+                      <option value="sat">Saturday</option>
+                      <option value="sun">Sunday</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Run at (time)</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={runTime}
+                      onChange={(e) => setRunTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  className="form-group"
+                  style={{ display: "flex", gap: 8, marginBottom: 8 }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Window start (day)</label>
+                    <select
+                      className="select"
+                      value={windowFromDay}
+                      onChange={(e) => setWindowFromDay(e.target.value)}
+                    >
+                      <option value="mon">Monday</option>
+                      <option value="tue">Tuesday</option>
+                      <option value="wed">Wednesday</option>
+                      <option value="thu">Thursday</option>
+                      <option value="fri">Friday</option>
+                      <option value="sat">Saturday</option>
+                      <option value="sun">Sunday</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Window start (time)</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={windowFromTime}
+                      onChange={(e) => setWindowFromTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  className="form-group"
+                  style={{ display: "flex", gap: 8 }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Window end (day)</label>
+                    <select
+                      className="select"
+                      value={windowToDay}
+                      onChange={(e) => setWindowToDay(e.target.value)}
+                    >
+                      <option value="mon">Monday</option>
+                      <option value="tue">Tuesday</option>
+                      <option value="wed">Wednesday</option>
+                      <option value="thu">Thursday</option>
+                      <option value="fri">Friday</option>
+                      <option value="sat">Saturday</option>
+                      <option value="sun">Sunday</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Window end (time)</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={windowToTime}
+                      onChange={(e) => setWindowToTime(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             <div
               style={{
@@ -364,20 +507,79 @@ export default function ReportSchedule() {
                     return;
                   }
 
-                  const period = `${dialogEvery}${dialogUnit}`;
                   const base = { group: dialogGroup.trim() };
 
-                  if (
-                    dialogReportType === "availability" ||
-                    dialogReportType === "both"
-                  ) {
-                    base.availability_period = period;
-                  }
-                  if (
-                    dialogReportType === "uptime" ||
-                    dialogReportType === "both"
-                  ) {
-                    base.uptime_period = period;
+                  if (dialogMode === "simple") {
+                    const period = `${dialogEvery}${dialogUnit}`;
+
+                    if (
+                      dialogReportType === "availability" ||
+                      dialogReportType === "both"
+                    ) {
+                      base.availability_period = period;
+                    }
+                    if (
+                      dialogReportType === "uptime" ||
+                      dialogReportType === "both"
+                    ) {
+                      base.uptime_period = period;
+                    }
+                  } else if (dialogMode === "weeklyWindow") {
+                    // Helper to map day -> index (Mon=0)
+                    const dayIndex = (d) => {
+                      const map = {
+                        mon: 0,
+                        tue: 1,
+                        wed: 2,
+                        thu: 3,
+                        fri: 4,
+                        sat: 5,
+                        sun: 6,
+                      };
+                      return map[d] ?? 0;
+                    };
+
+                    const toMinutes = (day, time) => {
+                      const [h, m] = time.split(":").map((v) => parseInt(v, 10));
+                      const hour = Number.isNaN(h) ? 0 : h;
+                      const minute = Number.isNaN(m) ? 0 : m;
+                      return dayIndex(day) * 24 * 60 + hour * 60 + minute;
+                    };
+
+                    const runMinutes = toMinutes(runDay, runTime);
+                    const fromMinutes = toMinutes(windowFromDay, windowFromTime);
+                    const toMinutesVal = toMinutes(windowToDay, windowToTime);
+
+                    const diffToToken = (minutesDiff) => {
+                      if (minutesDiff % 60 === 0) {
+                        const hours = minutesDiff / 60;
+                        return `${hours}h`;
+                      }
+                      return `${minutesDiff}m`;
+                    };
+
+                    const startDiff = fromMinutes - runMinutes;
+                    const endDiff = toMinutesVal - runMinutes;
+
+                    // Weekly cadence
+                    const period = "1w";
+
+                    if (
+                      dialogReportType === "availability" ||
+                      dialogReportType === "both"
+                    ) {
+                      base.availability_period = period;
+                      base.availability_window_start = diffToToken(startDiff);
+                      base.availability_window_end = diffToToken(endDiff);
+                    }
+                    if (
+                      dialogReportType === "uptime" ||
+                      dialogReportType === "both"
+                    ) {
+                      base.uptime_period = period;
+                      base.uptime_window_start = diffToToken(startDiff);
+                      base.uptime_window_end = diffToToken(endDiff);
+                    }
                   }
 
                   setRows((prev) => [...prev, base]);
