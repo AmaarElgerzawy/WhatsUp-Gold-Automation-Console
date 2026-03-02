@@ -890,8 +890,26 @@ def run_scheduled_reports():
 
                     if win_start_raw and win_end_raw:
                         try:
-                            start_date = now_run + parse_period(win_start_raw)
-                            end_date = now_run + parse_period(win_end_raw)
+                            win_start_td = parse_period(win_start_raw)
+                            win_end_td = parse_period(win_end_raw)
+
+                            adj_start_td = win_start_td
+                            adj_end_td = win_end_td
+
+                            # If both offsets are non‑negative and the period is at least a week,
+                            # interpret them as offsets *inside the previous period*.
+                            # This matches weekly report configs like "last week Mon 10:00 → Fri 10:00"
+                            # that were authored relative to the run time.
+                            if (
+                                win_start_td >= timedelta(0)
+                                and win_end_td >= timedelta(0)
+                                and period_td >= timedelta(days=7)
+                            ):
+                                adj_start_td = win_start_td - period_td
+                                adj_end_td = win_end_td - period_td
+
+                            start_date = now_run + adj_start_td
+                            end_date = now_run + adj_end_td
                         except Exception as e:
                             print(f"[SKIP] Invalid availability window for '{group_name_stripped}': {e}")
                             start_date = None
@@ -940,8 +958,23 @@ def run_scheduled_reports():
 
                     if win_start_raw and win_end_raw:
                         try:
-                            start_date = now_run + parse_period(win_start_raw)
-                            end_date = now_run + parse_period(win_end_raw)
+                            win_start_td = parse_period(win_start_raw)
+                            win_end_td = parse_period(win_end_raw)
+
+                            adj_start_td = win_start_td
+                            adj_end_td = win_end_td
+
+                            # Same weekly semantics as availability windows.
+                            if (
+                                win_start_td >= timedelta(0)
+                                and win_end_td >= timedelta(0)
+                                and period_td >= timedelta(days=7)
+                            ):
+                                adj_start_td = win_start_td - period_td
+                                adj_end_td = win_end_td - period_td
+
+                            start_date = now_run + adj_start_td
+                            end_date = now_run + adj_end_td
                         except Exception as e:
                             print(f"[SKIP] Invalid uptime window for '{group_name_stripped}': {e}")
                             start_date = None

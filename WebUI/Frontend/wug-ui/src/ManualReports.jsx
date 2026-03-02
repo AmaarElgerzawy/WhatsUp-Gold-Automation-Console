@@ -8,6 +8,7 @@ export default function ManualReports() {
   const [groupName, setGroupName] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [periodPreset, setPeriodPreset] = useState("custom");
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState(null);
   const [error, setError] = useState("");
@@ -18,6 +19,56 @@ export default function ManualReports() {
       .then(setGroups)
       .catch(() => setError("Failed to load groups"));
   }, []);
+
+  const toLocalInput = (date) => {
+    if (!(date instanceof Date)) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const applyPreset = (preset) => {
+    const now = new Date();
+
+    if (preset === "last_week_work_window") {
+      // Last week: Monday 10:00 → Friday 10:00
+      const day = now.getDay(); // 0=Sun..6=Sat
+      const mondayThisWeek = new Date(now);
+      const diffToMonday = (day + 6) % 7; // how many days since Monday
+      mondayThisWeek.setDate(now.getDate() - diffToMonday);
+      mondayThisWeek.setHours(10, 0, 0, 0);
+
+      const mondayLastWeek = new Date(mondayThisWeek);
+      mondayLastWeek.setDate(mondayThisWeek.getDate() - 7);
+
+      const fridayLastWeek = new Date(mondayLastWeek);
+      fridayLastWeek.setDate(mondayLastWeek.getDate() + 4);
+      fridayLastWeek.setHours(10, 0, 0, 0);
+
+      setStart(toLocalInput(mondayLastWeek));
+      setEnd(toLocalInput(fridayLastWeek));
+      return;
+    }
+
+    if (preset === "full_last_month") {
+      // Full previous calendar month
+      const firstThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      let firstPrevMonth;
+      if (firstThisMonth.getMonth() === 0) {
+        firstPrevMonth = new Date(firstThisMonth.getFullYear() - 1, 11, 1, 0, 0, 0, 0);
+      } else {
+        firstPrevMonth = new Date(firstThisMonth.getFullYear(), firstThisMonth.getMonth() - 1, 1, 0, 0, 0, 0);
+      }
+
+      setStart(toLocalInput(firstPrevMonth));
+      setEnd(toLocalInput(firstThisMonth));
+      return;
+    }
+  };
 
   const generate = async () => {
     if (!groupId || !start || !end) {
@@ -99,6 +150,26 @@ export default function ManualReports() {
             </select>
           </div>
           <div className="from-group">
+            <div className="form-group">
+              <label className="form-label">Report period</label>
+              <select
+                className="select"
+                value={periodPreset}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setPeriodPreset(value);
+                  if (value !== "custom") {
+                    applyPreset(value);
+                  }
+                }}
+              >
+                <option value="custom">Custom (choose dates)</option>
+                <option value="last_week_work_window">
+                  Last week: Monday 10:00 → Friday 10:00
+                </option>
+                <option value="full_last_month">Full last month</option>
+              </select>
+            </div>
             <div className="form-group">
               <label className="form-label">Start Date & Time</label>
               <div className="date-box">
