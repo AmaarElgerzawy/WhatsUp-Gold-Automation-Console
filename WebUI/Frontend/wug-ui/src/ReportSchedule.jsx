@@ -17,10 +17,8 @@ export default function ReportSchedule() {
   const [dialogUnit, setDialogUnit] = useState("d"); // m, h, d, w
   const [runDay, setRunDay] = useState("mon");
   const [runTime, setRunTime] = useState("10:00");
-  const [windowFromDay, setWindowFromDay] = useState("mon");
-  const [windowFromTime, setWindowFromTime] = useState("10:00");
-  const [windowToDay, setWindowToDay] = useState("fri");
-  const [windowToTime, setWindowToTime] = useState("10:00");
+  const [windowFromDateTime, setWindowFromDateTime] = useState("");
+  const [windowToDateTime, setWindowToDateTime] = useState("");
 
   useEffect(() => {
     apiCall("reports/schedule")
@@ -199,10 +197,8 @@ export default function ReportSchedule() {
               setDialogMode("simple");
               setRunDay("mon");
               setRunTime("10:00");
-              setWindowFromDay("mon");
-              setWindowFromTime("10:00");
-              setWindowToDay("fri");
-              setWindowToTime("10:00");
+              setWindowFromDateTime("");
+              setWindowToDateTime("");
               setShowDialog(true);
             }}
           >
@@ -419,66 +415,24 @@ export default function ReportSchedule() {
                   </div>
                 </div>
 
-                <div
-                  className="form-group"
-                  style={{ display: "flex", gap: 8, marginBottom: 8 }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <label className="form-label">Window start (day)</label>
-                    <select
-                      className="select"
-                      value={windowFromDay}
-                      onChange={(e) => setWindowFromDay(e.target.value)}
-                    >
-                      <option value="mon">Monday</option>
-                      <option value="tue">Tuesday</option>
-                      <option value="wed">Wednesday</option>
-                      <option value="thu">Thursday</option>
-                      <option value="fri">Friday</option>
-                      <option value="sat">Saturday</option>
-                      <option value="sun">Sunday</option>
-                    </select>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label className="form-label">Window start (time)</label>
-                    <input
-                      className="input"
-                      type="time"
-                      value={windowFromTime}
-                      onChange={(e) => setWindowFromTime(e.target.value)}
-                    />
-                  </div>
+                <div className="form-group" style={{ marginBottom: 8 }}>
+                  <label className="form-label">Window start (date &amp; time)</label>
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    value={windowFromDateTime}
+                    onChange={(e) => setWindowFromDateTime(e.target.value)}
+                  />
                 </div>
 
-                <div
-                  className="form-group"
-                  style={{ display: "flex", gap: 8 }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <label className="form-label">Window end (day)</label>
-                    <select
-                      className="select"
-                      value={windowToDay}
-                      onChange={(e) => setWindowToDay(e.target.value)}
-                    >
-                      <option value="mon">Monday</option>
-                      <option value="tue">Tuesday</option>
-                      <option value="wed">Wednesday</option>
-                      <option value="thu">Thursday</option>
-                      <option value="fri">Friday</option>
-                      <option value="sat">Saturday</option>
-                      <option value="sun">Sunday</option>
-                    </select>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label className="form-label">Window end (time)</label>
-                    <input
-                      className="input"
-                      type="time"
-                      value={windowToTime}
-                      onChange={(e) => setWindowToTime(e.target.value)}
-                    />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">Window end (date &amp; time)</label>
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    value={windowToDateTime}
+                    onChange={(e) => setWindowToDateTime(e.target.value)}
+                  />
                 </div>
               </div>
             )}
@@ -525,6 +479,11 @@ export default function ReportSchedule() {
                       base.uptime_period = period;
                     }
                   } else if (dialogMode === "weeklyWindow") {
+                    if (!windowFromDateTime || !windowToDateTime) {
+                      alert("Please enter both window start and end date & time.");
+                      return;
+                    }
+
                     // Helper to map day -> index (Mon=0)
                     const dayIndex = (d) => {
                       const map = {
@@ -539,16 +498,67 @@ export default function ReportSchedule() {
                       return map[d] ?? 0;
                     };
 
-                    const toMinutes = (day, time) => {
+                    const toMinutesFromDayAndTime = (day, time) => {
                       const [h, m] = time.split(":").map((v) => parseInt(v, 10));
                       const hour = Number.isNaN(h) ? 0 : h;
                       const minute = Number.isNaN(m) ? 0 : m;
                       return dayIndex(day) * 24 * 60 + hour * 60 + minute;
                     };
 
-                    const runMinutes = toMinutes(runDay, runTime);
-                    const fromMinutes = toMinutes(windowFromDay, windowFromTime);
-                    const toMinutesVal = toMinutes(windowToDay, windowToTime);
+                    const toMinutesFromDateTime = (value) => {
+                      if (!value || typeof value !== "string") return null;
+                      const [datePart, timePart] = value.split("T");
+                      if (!datePart || !timePart) return null;
+
+                      const [year, month, day] = datePart
+                        .split("-")
+                        .map((v) => parseInt(v, 10));
+                      const jsDate = new Date(
+                        Number.isNaN(year) ? 1970 : year,
+                        Number.isNaN(month) ? 0 : month - 1,
+                        Number.isNaN(day) ? 1 : day
+                      );
+
+                      const weekday = jsDate.getDay(); // 0=Sun..6=Sat
+                      const weekdayToKey = {
+                        1: "mon",
+                        2: "tue",
+                        3: "wed",
+                        4: "thu",
+                        5: "fri",
+                        6: "sat",
+                        0: "sun",
+                      };
+                      const dayKey = weekdayToKey[weekday] || "mon";
+
+                      const [h, m] = timePart
+                        .split(":")
+                        .map((v) => parseInt(v, 10));
+                      const hour = Number.isNaN(h) ? 0 : h;
+                      const minute = Number.isNaN(m) ? 0 : m;
+
+                      const timeStr = `${String(hour).padStart(2, "0")}:${String(
+                        minute
+                      ).padStart(2, "0")}`;
+
+                      return toMinutesFromDayAndTime(dayKey, timeStr);
+                    };
+
+                    const runMinutes = toMinutesFromDayAndTime(runDay, runTime);
+                    const fromMinutes = toMinutesFromDateTime(windowFromDateTime);
+                    const toMinutesVal = toMinutesFromDateTime(windowToDateTime);
+
+                    if (
+                      fromMinutes === null ||
+                      toMinutesVal === null ||
+                      Number.isNaN(fromMinutes) ||
+                      Number.isNaN(toMinutesVal)
+                    ) {
+                      alert(
+                        "Invalid window start or end. Please use a valid date & time."
+                      );
+                      return;
+                    }
 
                     const diffToToken = (minutesDiff) => {
                       if (minutesDiff % 60 === 0) {
