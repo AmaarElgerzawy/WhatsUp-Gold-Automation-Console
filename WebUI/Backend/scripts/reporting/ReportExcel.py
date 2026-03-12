@@ -3,25 +3,14 @@ import json
 import os
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
-import os
 from pathlib import Path
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 import pandas as pd
+import resend
 from constants import (
     get_connection_string,
-    SMTP_SERVER,
-    SMTP_PORT,
-    BREVO_USERNAME,
-    BREVO_SMTP_KEY,
-    SENDER,
-    RECEIVER,
     REPORT_SCHEDULE_JSON_FILE,
 )
 try:
@@ -36,13 +25,19 @@ except ImportError:
 OUTPUT_FOLDER = r"C:\WUG_Exports"
 # Preferred JSON-based schedule shared with the FastAPI API
 SCHEDULE_JSON_FILE = str(REPORT_SCHEDULE_JSON_FILE)
-# Legacy Excel config (kept as a fallback for migration)
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "report_schedule.xlsx")
+
+# Resend configuration (provided by user)
+RESEND_API_KEY = "re_j4PGF4Ev_Jr1M8fDaaARvJS7WocdFACDt"
+RESEND_FROM = "onboarding@resend.dev"
+RESEND_TO = "snipergolden1234@gmail.com"
+
+resend.api_key = RESEND_API_KEY
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state.json")
 # =================================
 def send_all_reports_via_email(start_date, end_date):
     """
-    Attach all XLSX reports from OUTPUT_FOLDER and send in one email.
+    Attach all XLSX reports from OUTPUT_FOLDER and send in one email
+    using Resend.
     """
     folder = Path(OUTPUT_FOLDER)
     if not folder.exists():
@@ -56,42 +51,40 @@ def send_all_reports_via_email(start_date, end_date):
         print("No report files found to send.")
         return
 
-    # Email subject & body
     subject = f"WUG Monthly Reports: {start_date:%Y-%m-%d} to {end_date:%Y-%m-%d}"
-    body = (
-        f"Attached are the Active Monitor Availability reports for all groups\n"
-        f"from {start_date:%Y-%m-%d %H:%M} to {end_date:%Y-%m-%d %H:%M}.\n\n"
-        f"Total reports: {len(report_files)}"
+    html_body = (
+        f"<p>Attached are the Active Monitor Availability reports for all groups<br>"
+        f"from {start_date:%Y-%m-%d %H:%M} to {end_date:%Y-%m-%d %H:%M}.</p>"
+        f"<p>Total reports: {len(report_files)}</p>"
     )
 
-    msg = MIMEMultipart()
-    msg["Subject"] = subject
-    msg["From"] = SENDER
-    msg["To"] = RECEIVER
-
-    msg.attach(MIMEText(body, "plain"))
-
-    # Attach each Excel file
+    attachments = []
     for report_path in report_files:
-        with open(report_path, "rb") as f:
-            part = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            part.set_payload(f.read())
-        encoders.encode_base64(part)
-        part.add_header(
-            "Content-Disposition",
-            f'attachment; filename="{os.path.basename(report_path)}"'
-        )
-        msg.attach(part)
+        try:
+            with open(report_path, "rb") as f:
+                content_bytes = f.read()
+            attachment: resend.Attachment = {
+                "content": list(content_bytes),
+                "filename": os.path.basename(report_path),
+            }
+            attachments.append(attachment)
+        except Exception as e:
+            print(f"[EMAIL] Failed to read attachment {report_path}: {e}")
+
+    params: resend.Emails.SendParams = {
+        "from": RESEND_FROM,
+        "to": [RESEND_TO],
+        "subject": subject,
+        "html": html_body,
+    }
+    if attachments:
+        params["attachments"] = attachments
 
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(BREVO_USERNAME, BREVO_SMTP_KEY)
-        server.sendmail(SENDER, [RECEIVER], msg.as_string())
-        server.quit()
-        print(f"Email sent successfully with {len(report_files)} attachments!")
+        resend.Emails.send(params)
+        print(f"[EMAIL] Resend monthly email sent with {len(attachments)} attachment(s).")
     except Exception as e:
-        print("ERROR sending email:", e)
+        print(f"[EMAIL] ERROR sending monthly email via Resend: {e}")
 
 # ========== CONFIG ==========
 WEB_USER_ID = 1  # same web user as in WUG (nWebUserID)
@@ -101,31 +94,41 @@ REPORT_PERCENT_DIVISOR = 10000000.0
 ROUND_TO_PLACES_EXPORT = 7
 # ============================
 def send_single_report_email(group_name, report_path, start_date, end_date):
+    """
+    Send a single report as an attachment using Resend.
+    """
     subject = f"WUG Report for {group_name}: {start_date:%Y-%m-%d %H:%M} → {end_date:%Y-%m-%d %H:%M}"
-    body = (
-        f"Attached is the Active Monitor Availability report for group '{group_name}'.\n\n"
-        f"Period: {start_date:%Y-%m-%d %H:%M} to {end_date:%Y-%m-%d %H:%M}."
+    html_body = (
+        f"<p>Attached is the report for group '<strong>{group_name}</strong>'.</p>"
+        f"<p>Period: {start_date:%Y-%m-%d %H:%M} to {end_date:%Y-%m-%d %H:%M}.</p>"
     )
 
-    msg = MIMEMultipart()
-    msg["Subject"] = subject
-    msg["From"] = SENDER
-    msg["To"] = RECEIVER
-    msg.attach(MIMEText(body, "plain"))
+    attachments = []
+    try:
+        with open(report_path, "rb") as f:
+            content_bytes = f.read()
+        attachment: resend.Attachment = {
+            "content": list(content_bytes),
+            "filename": os.path.basename(report_path),
+        }
+        attachments.append(attachment)
+    except Exception as e:
+        print(f"[EMAIL] Failed to read attachment {report_path}: {e}")
 
-    with open(report_path, "rb") as f:
-        part = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        part.set_payload(f.read())
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition", f'attachment; filename="{os.path.basename(report_path)}"')
-    msg.attach(part)
+    params: resend.Emails.SendParams = {
+        "from": RESEND_FROM,
+        "to": [RESEND_TO],
+        "subject": subject,
+        "html": html_body,
+    }
+    if attachments:
+        params["attachments"] = attachments
 
-    server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-    server.starttls()
-    server.login(BREVO_USERNAME, BREVO_SMTP_KEY)
-    server.sendmail(SENDER, [RECEIVER], msg.as_string())
-    server.quit()
-    print(f"Email sent for group {group_name} with {report_path}")
+    try:
+        resend.Emails.send(params)
+        print(f"[EMAIL] Resend email sent for group {group_name} with attachment {report_path}")
+    except Exception as e:
+        print(f"[EMAIL] ERROR sending email via Resend for group {group_name}: {e}")
 
 def get_date_range_from_period(period_td):
     end = datetime.now()
@@ -177,48 +180,47 @@ def parse_period(period: str) -> timedelta:
 
 def load_schedule_config():
     """
-    Load scheduling configuration from the Excel file.
+    Load scheduling configuration from the JSON file produced by the API.
 
-    Supported layouts:
-    - Legacy:
-        columns: ["group", "period"]
-        → both reports (availability + uptime) use the same period and a simple rolling window
-    - New (per‑report control from the frontend grid):
-        columns: ["group", "availability_period", "uptime_period"]
-        (column names are case‑insensitive; "availability" / "uptime" also work)
+    Shape in JSON (report_schedule.json):
+      {
+        "columns": [...],
+        "rows": [
+          {
+            "group": "...",
+            "availability_period": "1w",
+            "availability_window_start": "-73h",
+            "availability_window_end": "-25h",
+            "uptime_period": "1w",
+            "uptime_window_start": "-73h",
+            "uptime_window_end": "-25h",
+            ...
+          },
+          ...
+        ]
+      }
 
-        Optional window columns per report type:
-        - availability_window_start, availability_window_end
-        - uptime_window_start, uptime_window_end
-
-        Window values are parsed like periods (e.g. "-73h", "-25h").
-        They are interpreted as offsets relative to the run time:
-          start = now + parse_period(window_start)
-          end   = now + parse_period(window_end)
-        If window_* are missing, we fall back to a rolling window:
-          [now - period, now]
+    This function no longer reads from the legacy Excel sheet; all
+    scheduling is driven by JSON so frontend and backend stay in sync.
     """
-    # Preferred JSON config if present
-    if os.path.exists(SCHEDULE_JSON_FILE):
-        with open(SCHEDULE_JSON_FILE, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        rows = raw.get("rows", [])
-        if rows:
-            df = pd.DataFrame(rows)
-        else:
-            df = pd.DataFrame()
+    if not os.path.exists(SCHEDULE_JSON_FILE):
+        return {}
+
+    with open(SCHEDULE_JSON_FILE, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    rows = raw.get("rows", [])
+    if rows:
+        df = pd.DataFrame(rows)
     else:
-        # Fallback to legacy Excel (if still present)
-        if not os.path.exists(CONFIG_FILE):
-            return {}
-        df = pd.read_excel(CONFIG_FILE)
+        df = pd.DataFrame()
     schedule = {}
 
     # Normalize column name lookups
     col_map = {str(c).strip().lower(): c for c in df.columns}
     group_col = col_map.get("group")
     if not group_col:
-        raise ValueError("report_schedule.xlsx must have a 'group' column")
+        # Nothing to schedule if there is no group column in JSON
+        return {}
 
     avail_col = col_map.get("availability_period") or col_map.get("availability")
     uptime_col = col_map.get("uptime_period") or col_map.get("uptime")
@@ -353,6 +355,7 @@ SELECT
     PivotActiveMonitorTypeToDevice.sArgument,
     PivotActiveMonitorTypeToDevice.nPivotActiveMonitorTypeToDeviceID,
     PivotActiveMonitorTypeToDevice.sComment,
+    CAST(Device.sNote AS NVARCHAR(MAX)) AS sNote,
 
     -- seconds in each state
     SUM(
@@ -549,7 +552,8 @@ GROUP BY
     PivotActiveMonitorTypeToDevice.nPivotActiveMonitorTypeToDeviceID,
     PivotActiveMonitorTypeToDevice.sArgument,
     PivotActiveMonitorTypeToDevice.sComment,
-    ActiveMonitorType.sMonitorTypeName
+    ActiveMonitorType.sMonitorTypeName,
+    CAST(Device.sNote AS NVARCHAR(MAX))
 ORDER BY
     Device.sDisplayName ASC,
     ActiveMonitorType.sMonitorTypeName ASC;
@@ -601,6 +605,9 @@ END;
         sMonitorTypeName = rec["sMonitorTypeName"]
         sArgument = rec["sArgument"] or ""
         sComment = rec["sComment"] or ""
+        
+        sIPAddress = rec["sNetworkAddress"]
+        sNote = rec["sNote"]
 
         monitor_name = sMonitorTypeName
         if sArgument:
@@ -610,6 +617,7 @@ END;
 
         results.append({
             "Device": rec["sDisplayName"],
+            "IPAddress": sIPAddress,
             "Monitor": monitor_name,
             "UpPercent": round(up_pct, ROUND_TO_PLACES_EXPORT),
             "UpDuration": up_dur,
@@ -620,6 +628,7 @@ END;
             "DownPercent": round(down_pct, ROUND_TO_PLACES_EXPORT),
             "DownDuration": down_dur,
             "TotalDuration": total_dur,
+            "Note": sNote,
         })
 
     cursor.close()
@@ -651,6 +660,7 @@ def write_excel_for_group(device_group_id: int,
     # Columns exactly like the WUG export
     headers = [
         "Device",
+        "Network Address (IP)",
         "Monitor",
         "Up",
         "Up Duration",
@@ -661,6 +671,7 @@ def write_excel_for_group(device_group_id: int,
         "Down",
         "Down Duration",
         "Total Duration",
+        "Note",
     ]
     last_col_letter = get_column_letter(len(headers))
 
@@ -713,57 +724,63 @@ def write_excel_for_group(device_group_id: int,
         # Device
         c = ws.cell(row=row_idx, column=1, value=r["Device"])
         c.border = thin_border
+        
+        c = ws.cell(row=row_idx, column=2, value=r["IPAddress"])
+        c.border = thin_border
+        
+        c = ws.cell(row=row_idx, column=3, value=r["Note"])
+        c.border = thin_border
 
         # Monitor
-        c = ws.cell(row=row_idx, column=2, value=r["Monitor"])
+        c = ws.cell(row=row_idx, column=4, value=r["Monitor"])
         c.border = thin_border
 
         # Up %
-        up_cell = ws.cell(row=row_idx, column=3, value=up_fraction)
+        up_cell = ws.cell(row=row_idx, column=5, value=up_fraction)
         up_cell.number_format = "0.0000000%"
         up_cell.alignment = right_align
         up_cell.border = thin_border
 
         # Up Duration
-        c = ws.cell(row=row_idx, column=4, value=r["UpDuration"])
+        c = ws.cell(row=row_idx, column=6, value=r["UpDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Maintenance %
-        maint_cell = ws.cell(row=row_idx, column=5, value=maint_fraction)
+        maint_cell = ws.cell(row=row_idx, column=7, value=maint_fraction)
         maint_cell.number_format = "0.0000000%"
         maint_cell.alignment = right_align
         maint_cell.border = thin_border
 
         # Maintenance Duration
-        c = ws.cell(row=row_idx, column=6, value=r["MaintenanceDuration"])
+        c = ws.cell(row=row_idx, column=8, value=r["MaintenanceDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Unknown %
-        unknown_cell = ws.cell(row=row_idx, column=7, value=unknown_fraction)
+        unknown_cell = ws.cell(row=row_idx, column=9, value=unknown_fraction)
         unknown_cell.number_format = "0.0000000%"
         unknown_cell.alignment = right_align
         unknown_cell.border = thin_border
 
         # Unknown Duration
-        c = ws.cell(row=row_idx, column=8, value=r["UnknownDuration"])
+        c = ws.cell(row=row_idx, column=10, value=r["UnknownDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Down %
-        down_cell = ws.cell(row=row_idx, column=9, value=down_fraction)
+        down_cell = ws.cell(row=row_idx, column=11, value=down_fraction)
         down_cell.number_format = "0.0000000%"
         down_cell.alignment = right_align
         down_cell.border = thin_border
 
         # Down Duration
-        c = ws.cell(row=row_idx, column=10, value=r["DownDuration"])
+        c = ws.cell(row=row_idx, column=12, value=r["DownDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Total Duration
-        c = ws.cell(row=row_idx, column=11, value=r["TotalDuration"])
+        c = ws.cell(row=row_idx, column=13, value=r["TotalDuration"])
         c.alignment = right_align
         c.border = thin_border
 
@@ -939,7 +956,7 @@ def run_scheduled_reports():
                                 end_date=end_date,
                             )
 
-                            state[state_key] = now_run.replace(minute=0, second=0, microsecond=0).isoformat()
+                            state[state_key] = now_run.replace(second=0, microsecond=0).isoformat()
                         except Exception as e:
                             print(f"[ERROR] while generating availability report for '{group_name_stripped}': {e}")
 
@@ -1015,7 +1032,7 @@ def run_scheduled_reports():
                                     start_date=start_date,
                                     end_date=end_date,
                                 )
-                                state[state_key] = now_run.replace(minute=0, second=0, microsecond=0).isoformat()
+                                state[state_key] = now_run.replace(second=0, microsecond=0).isoformat()
                             else:
                                 print(f"[RUN] No uptime data for '{group_name_stripped}' in scheduled window (will retry next run)")
                                 # Do not update state so the job runs again next period
