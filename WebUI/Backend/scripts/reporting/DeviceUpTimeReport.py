@@ -1,4 +1,5 @@
 import os
+from pandas import pivot_table
 import pyodbc
 from datetime import datetime
 from openpyxl import Workbook
@@ -60,6 +61,23 @@ BEGIN
     EXEC('DROP TABLE ' + @PivotTable);
 END;
 
+CREATE TABLE #Result
+(
+    sDisplayName NVARCHAR(255),
+    nDeviceID INT,
+    sNetworkAddress NVARCHAR(255),
+    nUpPercent BIGINT,
+    nUpSeconds BIGINT,
+    nMaintenancePercent BIGINT,
+    nMaintenanceSeconds BIGINT,
+    nUnknownPercent BIGINT,
+    nUnknownSeconds BIGINT,
+    nDownPercent BIGINT,
+    nDownSeconds BIGINT,
+    nTotalSeconds BIGINT
+);
+
+INSERT INTO #Result
 EXEC dbo.spGroupDeviceUptime
     @nDeviceGroupID      = {device_group_id},
     @dSqlStartDate       = '{start_str}',
@@ -72,6 +90,19 @@ EXEC dbo.spGroupDeviceUptime
     @nHighCount          = 32767,
     @nRowCount           = '32767',
     @bAllPages           = 1;
+
+SELECT
+    r.*,
+    ni.sNetworkAddress AS InterfaceAddress,
+    d.sNote
+FROM #Result r
+LEFT JOIN Device d
+    ON d.nDeviceID = r.nDeviceID
+LEFT JOIN NetworkInterface ni
+    ON ni.nDeviceID = r.nDeviceID
+    AND ni.bPrimaryInterface = 1;
+
+DROP TABLE #Result;
 
 IF OBJECT_ID(@PivotTable,'U') IS NOT NULL
 BEGIN
@@ -100,6 +131,9 @@ END;
         results.append({
             "Device": rec["sDisplayName"],
             "Address": rec["sNetworkAddress"],
+            "InterfaceAddress": rec["InterfaceAddress"],
+            "Note": rec["sNote"],
+
             "Up": pct(rec["nUpPercent"]),
             "UpDuration": get_duration_from_seconds(rec["nUpSeconds"]),
             "Maintenance": pct(rec["nMaintenancePercent"]),
@@ -128,7 +162,10 @@ def write_excel(group_name, rows, start_date, end_date):
     ws.title = "Active Monitor Availability"
 
     headers = [
-        "Device", "Address",
+        "Device",
+        "Address",
+        "Interface Address",
+        "Note",
         "Up", "Up Duration",
         "Maintenance", "Maintenance Duration",
         "Unknown", "Unknown Duration",
@@ -167,18 +204,20 @@ def write_excel(group_name, rows, start_date, end_date):
     for r in rows:
         ws.cell(r_idx, 1, r["Device"]).border = border
         ws.cell(r_idx, 2, r["Address"]).border = border
+        ws.cell(r_idx, 3, r["InterfaceAddress"]).border = border
+        ws.cell(r_idx, 4, r["Note"]).border = border
 
-        for col, key in [(3,"Up"),(5,"Maintenance"),(7,"Unknown"),(9,"Down")]:
+        for col, key in [(5,"Up"),(7,"Maintenance"),(9,"Unknown"),(11,"Down")]:
             c = ws.cell(r_idx, col, r[key] / 100)
             c.number_format = "0.0000000%"
             c.alignment = right
             c.border = border
 
-        ws.cell(r_idx, 4, r["UpDuration"]).alignment = right
-        ws.cell(r_idx, 6, r["MaintenanceDuration"]).alignment = right
-        ws.cell(r_idx, 8, r["UnknownDuration"]).alignment = right
-        ws.cell(r_idx, 10, r["DownDuration"]).alignment = right
-        ws.cell(r_idx, 11, r["TotalDuration"]).alignment = right
+        ws.cell(r_idx, 6, r["UpDuration"])
+        ws.cell(r_idx, 8, r["MaintenanceDuration"])
+        ws.cell(r_idx, 10, r["UnknownDuration"])
+        ws.cell(r_idx, 12, r["DownDuration"])
+        ws.cell(r_idx, 13, r["TotalDuration"])
 
         r_idx += 1
 
