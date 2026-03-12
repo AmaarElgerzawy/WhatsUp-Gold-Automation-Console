@@ -53,7 +53,6 @@ def get_device_extra_data(device_ids):
     FROM Device d
     LEFT JOIN NetworkInterface ni
         ON ni.nDeviceID = d.nDeviceID
-        AND ni.bPrimaryInterface = 1
     WHERE d.nDeviceID IN ({ids})
     """
 
