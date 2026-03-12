@@ -38,6 +38,39 @@ def get_duration_from_seconds(total_seconds: int) -> str:
     return " ".join(parts)
 
 
+def get_device_extra_data(device_ids):
+
+    conn = pyodbc.connect(get_connection_string())
+    cur = conn.cursor()
+
+    ids = ",".join(str(i) for i in device_ids)
+
+    sql = f"""
+    SELECT
+        d.nDeviceID,
+        d.sNote,
+        ni.sNetworkAddress AS InterfaceAddress
+    FROM Device d
+    LEFT JOIN NetworkInterface ni
+        ON ni.nDeviceID = d.nDeviceID
+        AND ni.bPrimaryInterface = 1
+    WHERE d.nDeviceID IN ({ids})
+    """
+
+    cur.execute(sql)
+
+    data = {}
+    for row in cur.fetchall():
+        data[row.nDeviceID] = {
+            "Note": row.sNote,
+            "InterfaceAddress": row.InterfaceAddress
+        }
+
+    cur.close()
+    conn.close()
+
+    return data
+
 def run_sp_group_device_uptime(
     device_group_id: int,
     start_date: datetime,
@@ -61,23 +94,6 @@ BEGIN
     EXEC('DROP TABLE ' + @PivotTable);
 END;
 
-CREATE TABLE #Result
-(
-    sDisplayName NVARCHAR(255),
-    nDeviceID INT,
-    sNetworkAddress NVARCHAR(255),
-    nUpPercent BIGINT,
-    nUpSeconds BIGINT,
-    nMaintenancePercent BIGINT,
-    nMaintenanceSeconds BIGINT,
-    nUnknownPercent BIGINT,
-    nUnknownSeconds BIGINT,
-    nDownPercent BIGINT,
-    nDownSeconds BIGINT,
-    nTotalSeconds BIGINT
-);
-
-INSERT INTO #Result
 EXEC dbo.spGroupDeviceUptime
     @nDeviceGroupID      = {device_group_id},
     @dSqlStartDate       = '{start_str}',
@@ -90,19 +106,6 @@ EXEC dbo.spGroupDeviceUptime
     @nHighCount          = 32767,
     @nRowCount           = '32767',
     @bAllPages           = 1;
-
-SELECT
-    r.*,
-    ni.sNetworkAddress AS InterfaceAddress,
-    d.sNote
-FROM #Result r
-LEFT JOIN Device d
-    ON d.nDeviceID = r.nDeviceID
-LEFT JOIN NetworkInterface ni
-    ON ni.nDeviceID = r.nDeviceID
-    AND ni.bPrimaryInterface = 1;
-
-DROP TABLE #Result;
 
 IF OBJECT_ID(@PivotTable,'U') IS NOT NULL
 BEGIN
@@ -129,11 +132,9 @@ END;
             return round((v or 0) / REPORT_PERCENT_DIVISOR, ROUND_TO_PLACES_EXPORT)
 
         results.append({
+            "DeviceID": rec["nDeviceID"],
             "Device": rec["sDisplayName"],
             "Address": rec["sNetworkAddress"],
-            "InterfaceAddress": rec["InterfaceAddress"],
-            "Note": rec["sNote"],
-
             "Up": pct(rec["nUpPercent"]),
             "UpDuration": get_duration_from_seconds(rec["nUpSeconds"]),
             "Maintenance": pct(rec["nMaintenancePercent"]),
@@ -145,6 +146,16 @@ END;
             "TotalDuration": get_duration_from_seconds(rec["nTotalSeconds"]),
         })
 
+        device_ids = [r["DeviceID"] for r in results]
+        if not device_ids:
+            return results
+
+        extra_data = get_device_extra_data(device_ids)
+
+        for r in results:
+            extra = extra_data.get(r["DeviceID"], {})
+            r["InterfaceAddress"] = extra.get("InterfaceAddress")
+            r["Note"] = extra.get("Note")
     return results
 
 
