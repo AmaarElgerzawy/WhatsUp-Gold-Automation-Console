@@ -618,6 +618,7 @@ END;
         results.append({
             "Device": rec["sDisplayName"],
             "IPAddress": sIPAddress,
+            "Note": sNote,
             "Monitor": monitor_name,
             "UpPercent": round(up_pct, ROUND_TO_PLACES_EXPORT),
             "UpDuration": up_dur,
@@ -628,7 +629,6 @@ END;
             "DownPercent": round(down_pct, ROUND_TO_PLACES_EXPORT),
             "DownDuration": down_dur,
             "TotalDuration": total_dur,
-            "Note": sNote,
         })
 
     cursor.close()
