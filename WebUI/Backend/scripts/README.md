@@ -21,8 +21,7 @@ scripts/
 │   └── routers.txt    # Router list for backups
 └── reporting/         # Report generation
     ├── ReportExcel.py
-    ├── report_config.py
-    └── report_schedule.xlsx
+    └── DeviceUpTimeReport.py
 ```
 
 ## Migration Notes

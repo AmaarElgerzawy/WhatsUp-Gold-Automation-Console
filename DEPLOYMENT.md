@@ -62,35 +62,6 @@
    - Use environment variables for API endpoint
    - Ensure CORS is properly configured
 
-### Docker Deployment (Optional)
-
-Create `Dockerfile` for backend:
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY WebUI/Backend/ ./WebUI/Backend/
-CMD ["uvicorn", "WebUI.Backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-Create `docker-compose.yml`:
-
-```yaml
-version: "3.8"
-services:
-  backend:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - WUG_DB_SERVER=${WUG_DB_SERVER}
-      - WUG_DB_NAME=${WUG_DB_NAME}
-    volumes:
-      - ./WebUI/Backend/data:/app/WebUI/Backend/data
-```
-
 ## Monitoring
 
 - Set up application logging

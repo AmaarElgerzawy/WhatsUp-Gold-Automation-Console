@@ -106,9 +106,7 @@ CONFIG_ROUTER_INTERACTIVE_DIR = CONFIG_DIR / "router_interactive"
 # Data files
 TEMPLATE_FILE = DATA_DIR / "bulk_templates.json"
 ROUTERS_FILE = BACKUP_SCRIPTS_DIR / "routers.txt"
-# Legacy Excel schedule (kept for backward compatibility / migration)
-REPORT_SCHEDULE_FILE = REPORTING_SCRIPTS_DIR / "report_schedule.xlsx"
-# New JSON-based schedule used by the API and scheduler
+# JSON-based schedule used by the API and scheduler
 REPORT_SCHEDULE_JSON_FILE = DATA_DIR / "report_schedule.json"
 USERS_FILE = DATA_DIR / "users.json"
 ACTIVITY_LOG_FILE = DATA_DIR / "activity_log.json"

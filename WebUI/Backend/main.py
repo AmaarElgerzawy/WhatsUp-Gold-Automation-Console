@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import shutil
 import json
 import io
+import uuid
 
 # Import auth module
 from auth import (
@@ -53,7 +54,6 @@ from constants import (
     CONFIG_ROUTER_INTERACTIVE_DIR,
     TEMPLATE_FILE,
     ROUTERS_FILE,
-    REPORT_SCHEDULE_FILE,
     REPORT_SCHEDULE_JSON_FILE,
     SCRIPTS,
     CSV_NAMES,
@@ -1096,9 +1096,6 @@ def get_report_schedule(current_user: dict = Depends(get_current_user)):
     Return the current report schedule in a JSON-friendly format.
 
     Primary source is REPORT_SCHEDULE_JSON_FILE (no Excel dependency).
-    If that doesn't exist but a legacy Excel schedule does, we read
-    the Excel once and expose it as JSON (optionally allowing a later
-    save to migrate it).
     """
     # Preferred JSON-based config
     if REPORT_SCHEDULE_JSON_FILE.exists():
@@ -1119,28 +1116,18 @@ def get_report_schedule(current_user: dict = Depends(get_current_user)):
         except Exception as e:
             raise HTTPException(500, f"Failed to read JSON schedule: {e}")
 
-    # Legacy Excel-based config (read-only until saved back as JSON)
-    if not REPORT_SCHEDULE_FILE.exists():
-        # No schedule configured yet: return an empty grid with sensible defaults
-        log_activity(current_user["id"], "view_report_schedule", "Viewed empty report schedule", "reports")
-        default_columns = [
-            "group",
-            "availability_period",
-            "uptime_period",
-            "availability_window_start",
-            "availability_window_end",
-            "uptime_window_start",
-            "uptime_window_end",
-        ]
-        return {"columns": default_columns, "rows": []}
-
-    df = pd.read_excel(REPORT_SCHEDULE_FILE)
-    log_activity(current_user["id"], "view_report_schedule", "Viewed report schedule (Excel legacy)", "reports")
-
-    return {
-        "columns": list(df.columns),
-        "rows": df.fillna("").to_dict(orient="records"),
-    }
+    # No schedule configured yet: return an empty grid with sensible defaults
+    log_activity(current_user["id"], "view_report_schedule", "Viewed empty report schedule", "reports")
+    default_columns = [
+        "group",
+        "availability_period",
+        "availability_window_start",
+        "availability_window_end",
+        "uptime_period",
+        "uptime_window_start",
+        "uptime_window_end",
+    ]
+    return {"columns": default_columns, "rows": []}
 
 @app.post("/reports/schedule")
 def save_report_schedule(
@@ -1155,20 +1142,31 @@ def save_report_schedule(
     if not isinstance(rows, list):
         raise HTTPException(400, "rows must be a list")
 
+    # Ensure each schedule row has a stable unique id so multiple rows for the
+    # same group can coexist and be tracked independently.
+    normalized_rows = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        rr = dict(r)
+        if not rr.get("id"):
+            rr["id"] = uuid.uuid4().hex
+        normalized_rows.append(rr)
+
     # Derive columns if not provided
     columns = payload.get("columns")
-    if not columns and rows:
-        columns = sorted({k for r in rows for k in r.keys()})
+    if not columns and normalized_rows:
+        columns = sorted({k for r in normalized_rows for k in r.keys()})
 
     try:
         REPORT_SCHEDULE_JSON_FILE.write_text(
-            json.dumps({"columns": columns or [], "rows": rows}, indent=2),
+            json.dumps({"columns": columns or [], "rows": normalized_rows}, indent=2),
             encoding="utf-8",
         )
         log_activity(
             current_user["id"],
             "save_report_schedule",
-            f"Updated report schedule with {len(rows)} entries (JSON)",
+            f"Updated report schedule with {len(normalized_rows)} entries (JSON)",
             "reports",
         )
         return {"status": "saved"}

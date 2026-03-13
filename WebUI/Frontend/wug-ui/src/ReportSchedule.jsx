@@ -49,7 +49,7 @@ export default function ReportSchedule() {
         // Merge: ensure all core fields exist first, then any extra columns
         const mergedFields = Array.from(
           new Set([...coreFields, ...backendColumns])
-        );
+        ).filter((f) => f !== "id");
 
         const columnFromField = (field) => {
           if (!field) return null;
@@ -153,7 +153,8 @@ export default function ReportSchedule() {
     // can round‑trip additional / custom columns.
     const columnFields = cols
       .filter((c) => c.field)
-      .map((c) => c.field);
+      .map((c) => c.field)
+      .filter((f) => f !== "id");
 
     await apiCall("reports/schedule", {
       method: "POST",
