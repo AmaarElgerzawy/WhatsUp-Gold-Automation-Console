@@ -811,6 +811,30 @@ def run_scheduled_reports():
     # jobs: list of schedule rows (each row is independent, even if group repeats)
     jobs = load_schedule_config()
     state = load_state()
+
+    # Prune state entries for deleted jobs.
+    # If a schedule row is removed, its job id won't exist anymore,
+    # so we delete its last-run markers from state.json.
+    valid_job_ids = set()
+    for idx, job in enumerate(jobs):
+        group_name = (job.get("group") or "").strip()
+        jid = (job.get("id") or "").strip() or f"{group_name}::__idx_{idx}"
+        if jid:
+            valid_job_ids.add(jid)
+
+    if isinstance(state, dict):
+        keys_to_delete = []
+        for k in state.keys():
+            if k == "__MONTHLY_ALL__":
+                continue
+            if "::__" not in k:
+                continue
+            prefix = k.split("::__", 1)[0]
+            if prefix not in valid_job_ids:
+                keys_to_delete.append(k)
+
+        for k in keys_to_delete:
+            del state[k]
     # --- Monthly all-groups run (once per month) ---
     last_monthly_str = state.get("__MONTHLY_ALL__")
     now = datetime.now()
