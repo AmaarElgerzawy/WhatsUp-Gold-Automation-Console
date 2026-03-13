@@ -111,13 +111,36 @@ export default function ReportSchedule() {
 
   // ---------- ROW / COLUMN ACTIONS ----------
 
+  const persistSchedule = async (rowsToSave) => {
+    // Persist both rows and the active column fields so the backend
+    // can round‑trip additional / custom columns.
+    const columnFields = cols
+      .filter((c) => c.field)
+      .map((c) => c.field)
+      .filter((f) => f !== "id");
+
+    await apiCall("reports/schedule", {
+      method: "POST",
+      body: JSON.stringify({
+        columns: columnFields,
+        rows: rowsToSave,
+      }),
+    });
+  };
+
   const deleteRow = () => {
     if (!gridApi) return;
     const selected = gridApi.getSelectedNodes();
     if (!selected.length) return;
 
     const toDelete = selected[0].data;
-    setRows((prev) => prev.filter((r) => r !== toDelete));
+    const nextRows = rows.filter((r) => r !== toDelete);
+    setRows(nextRows);
+
+    // Auto-save deletions so removed schedules stop executing immediately.
+    persistSchedule(nextRows)
+      .then(() => alert("Deleted and saved successfully"))
+      .catch((e) => alert(`Failed to save deletion: ${e}`));
   };
 
   const addColumn = () => {
@@ -148,21 +171,7 @@ export default function ReportSchedule() {
   const save = async () => {
     const updated = [];
     gridApi.forEachNode((n) => updated.push(n.data));
-
-    // Persist both rows and the active column fields so the backend
-    // can round‑trip additional / custom columns.
-    const columnFields = cols
-      .filter((c) => c.field)
-      .map((c) => c.field)
-      .filter((f) => f !== "id");
-
-    await apiCall("reports/schedule", {
-      method: "POST",
-      body: JSON.stringify({
-        columns: columnFields,
-        rows: updated,
-      }),
-    });
+    await persistSchedule(updated);
 
     alert("Saved successfully");
   };
