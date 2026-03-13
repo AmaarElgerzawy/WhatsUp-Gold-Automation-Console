@@ -845,6 +845,46 @@ def _get_weekly_target(run_day: str, run_time: str, now: datetime) -> datetime:
     )
 
 
+def _should_run_weekly_anchor(last_run_str: str, run_day: str, run_time: str, now: datetime) -> tuple[bool, datetime]:
+    """
+    Strict weekly anchor:
+    - Only run on the configured weekday (e.g. Friday).
+    - Only run at/after the configured time on that day.
+    - Only run once per anchor timestamp (based on state last_run).
+
+    Returns (should_run, anchor_datetime_for_today).
+    """
+    target_wd = _weekday_index(run_day)
+
+    # Must be the configured day
+    if now.weekday() != target_wd:
+        return False, None
+
+    # Anchor is "today at HH:MM"
+    try:
+        hour, minute = map(int, (run_time or "00:00").split(":", 1))
+    except ValueError:
+        hour, minute = 0, 0
+
+    anchor_dt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    # Must be at/after the configured time
+    if now < anchor_dt:
+        return False, anchor_dt
+
+    # Must not have already run for this anchor
+    if last_run_str:
+        try:
+            last_run = datetime.fromisoformat(last_run_str)
+            if last_run >= anchor_dt:
+                return False, anchor_dt
+        except Exception:
+            # If state is corrupted, allow run (and it will be rewritten)
+            pass
+
+    return True, anchor_dt
+
+
 def _compute_window(now_run: datetime, period_td: timedelta, win_start_raw, win_end_raw):
     """
     Compute [start_date, end_date] for a job given the base run time and window
@@ -975,10 +1015,9 @@ def run_scheduled_reports():
                 now_run = None
 
                 if use_weekly_anchor:
-                    target_dt = _get_weekly_target(run_day, run_time, now)
-                    last_run = datetime.fromisoformat(last_run_str) if last_run_str else None
-                    if now >= target_dt and (last_run is None or last_run < target_dt):
-                        now_run = target_dt
+                    should_run_anchor, anchor_dt = _should_run_weekly_anchor(last_run_str, run_day, run_time, now)
+                    if should_run_anchor:
+                        now_run = anchor_dt
                 else:
                     if should_run(last_run_str, period_td):
                         now_run = datetime.now()
@@ -1031,10 +1070,9 @@ def run_scheduled_reports():
                 now_run = None
 
                 if use_weekly_anchor:
-                    target_dt = _get_weekly_target(run_day, run_time, now)
-                    last_run = datetime.fromisoformat(last_run_str) if last_run_str else None
-                    if now >= target_dt and (last_run is None or last_run < target_dt):
-                        now_run = target_dt
+                    should_run_anchor, anchor_dt = _should_run_weekly_anchor(last_run_str, run_day, run_time, now)
+                    if should_run_anchor:
+                        now_run = anchor_dt
                 else:
                     if should_run(last_run_str, period_td):
                         now_run = datetime.now()
