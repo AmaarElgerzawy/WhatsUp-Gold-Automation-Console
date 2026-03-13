@@ -35,6 +35,8 @@ export default function ReportSchedule() {
         // Known core scheduling fields in preferred order
         const coreFields = [
           "group",
+          "run_day",
+          "run_time",
           "availability_period",
           "availability_window_start",
           "availability_window_end",
@@ -59,6 +61,10 @@ export default function ReportSchedule() {
             switch (field) {
               case "group":
                 return "Group name";
+              case "run_day":
+                return "Run day (weekly mode)";
+              case "run_time":
+                return "Run time (HH:MM)";
               case "availability_period":
                 return "Availability period (e.g. 1d, 1w)";
               case "availability_window_start":

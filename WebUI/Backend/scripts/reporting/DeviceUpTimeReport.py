@@ -17,8 +17,6 @@ REPORT_PERCENT_DIVISOR = 10_000_000.0
 ROUND_TO_PLACES_EXPORT = 7
 
 # =========================================
-
-
 def get_duration_from_seconds(total_seconds: int) -> str:
     if not total_seconds or total_seconds < 0:
         total_seconds = 0
@@ -36,7 +34,6 @@ def get_duration_from_seconds(total_seconds: int) -> str:
         parts.append(f"{minutes}m")
 
     return " ".join(parts)
-
 
 def get_device_extra_data(device_ids):
 
@@ -153,10 +150,8 @@ END;
 
         for r in results:
             extra = extra_data.get(r["DeviceID"], {})
-            r["InterfaceAddress"] = extra.get("InterfaceAddress")
             r["Note"] = extra.get("Note")
     return results
-
 
 def write_excel(group_name, rows, start_date, end_date):
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -174,7 +169,6 @@ def write_excel(group_name, rows, start_date, end_date):
     headers = [
         "Device",
         "Address",
-        "Interface Address",
         "Note",
         "Up", "Up Duration",
         "Maintenance", "Maintenance Duration",

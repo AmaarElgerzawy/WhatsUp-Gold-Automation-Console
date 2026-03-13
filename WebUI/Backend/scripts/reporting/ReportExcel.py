@@ -232,6 +232,8 @@ def load_schedule_config():
         entry = {
             "id": job_id,
             "group": group_name,
+            "run_day": _clean(row.get("run_day")),
+            "run_time": _clean(row.get("run_time")),
             "availability_period": _clean(row.get("availability_period") or row.get("availability")),
             "uptime_period": _clean(row.get("uptime_period") or row.get("uptime")),
             "availability_window_start": _clean(row.get("availability_window_start")),
@@ -801,6 +803,72 @@ def get_previous_month_range():
     return first_prev_month, first_this_month
 
 
+def _weekday_index(day_code: str) -> int:
+    """
+    Map a short day code like 'mon', 'tue', ... to Python weekday index (Mon=0).
+    """
+    code = (day_code or "").strip().lower()
+    mapping = {
+        "mon": 0,
+        "tue": 1,
+        "wed": 2,
+        "thu": 3,
+        "fri": 4,
+        "sat": 5,
+        "sun": 6,
+    }
+    return mapping.get(code, 0)
+
+
+def _get_weekly_target(run_day: str, run_time: str, now: datetime) -> datetime:
+    """
+    Given a run day code (mon..sun) and HH:MM time, return the scheduled
+    datetime for the current week. Jobs will execute once when 'now' passes
+    this target and when the last_run stored in state is older than it.
+    """
+    wd_target = _weekday_index(run_day)
+    try:
+        hour, minute = map(int, (run_time or "00:00").split(":", 1))
+    except ValueError:
+        hour, minute = 0, 0
+
+    days_ahead = wd_target - now.weekday()
+    target_date = (now + timedelta(days=days_ahead)).date()
+    return datetime(
+        year=target_date.year,
+        month=target_date.month,
+        day=target_date.day,
+        hour=hour,
+        minute=minute,
+        second=0,
+        microsecond=0,
+    )
+
+
+def _compute_window(now_run: datetime, period_td: timedelta, win_start_raw, win_end_raw):
+    """
+    Compute [start_date, end_date] for a job given the base run time and window
+    offsets. Supports special 'full_last_month' preset.
+    """
+    if win_start_raw and win_end_raw:
+        win_start_str = str(win_start_raw).strip()
+        win_end_str = str(win_end_raw).strip()
+
+        if win_start_str == "full_last_month" and win_end_str == "full_last_month":
+            return get_previous_month_range()
+
+        # Treat as relative offsets from the run time
+        win_start_td = parse_period(win_start_raw)
+        win_end_td = parse_period(win_end_raw)
+        start_date = now_run + win_start_td
+        end_date = now_run + win_end_td
+        return start_date, end_date
+
+    # Default rolling window: [run_time - period, run_time]
+    end = now_run
+    start = end - period_td
+    return start, end
+
 def run_scheduled_reports():
     """
     Execute all due scheduled reports based on the Excel configuration
@@ -900,44 +968,29 @@ def run_scheduled_reports():
             else:
                 state_key = f"{job_id}::__availability"
                 last_run_str = state.get(state_key)
+                run_day = periods.get("run_day")
+                run_time = periods.get("run_time")
 
-                if should_run(last_run_str, period_td):
-                    now_run = datetime.now()
+                use_weekly_anchor = bool(run_day and run_time and period_td >= timedelta(days=7))
+                now_run = None
+
+                if use_weekly_anchor:
+                    target_dt = _get_weekly_target(run_day, run_time, now)
+                    last_run = datetime.fromisoformat(last_run_str) if last_run_str else None
+                    if now >= target_dt and (last_run is None or last_run < target_dt):
+                        now_run = target_dt
+                else:
+                    if should_run(last_run_str, period_td):
+                        now_run = datetime.now()
+
+                if now_run is not None:
                     win_start_raw = periods.get("availability_window_start")
                     win_end_raw = periods.get("availability_window_end")
-
-                    if win_start_raw and win_end_raw:
-                        win_start_str = str(win_start_raw).strip()
-                        win_end_str = str(win_end_raw).strip()
-                        if win_start_str == "full_last_month" and win_end_str == "full_last_month":
-                            start_date, end_date = get_previous_month_range()
-                        else:
-                            try:
-                                win_start_td = parse_period(win_start_raw)
-                                win_end_td = parse_period(win_end_raw)
-
-                                adj_start_td = win_start_td
-                                adj_end_td = win_end_td
-
-                                # If both offsets are non‑negative and the period is at least a week,
-                                # interpret them as offsets *inside the previous period*.
-                                if (
-                                    win_start_td >= timedelta(0)
-                                    and win_end_td >= timedelta(0)
-                                    and period_td >= timedelta(days=7)
-                                ):
-                                    adj_start_td = win_start_td - period_td
-                                    adj_end_td = win_end_td - period_td
-
-                                start_date = now_run + adj_start_td
-                                end_date = now_run + adj_end_td
-                            except Exception as e:
-                                print(f"[SKIP] Invalid availability window for '{group_name_stripped}': {e}")
-                                start_date = None
-                                end_date = None
-                    else:
-                        # Default rolling window
-                        start_date, end_date = get_date_range_from_period(period_td)
+                    try:
+                        start_date, end_date = _compute_window(now_run, period_td, win_start_raw, win_end_raw)
+                    except Exception as e:
+                        print(f"[SKIP] Invalid availability window for '{group_name_stripped}': {e}")
+                        start_date = end_date = None
 
                     if start_date and end_date and start_date < end_date:
                         device_group_id = name_to_id[group_name_stripped]
@@ -971,43 +1024,29 @@ def run_scheduled_reports():
             else:
                 state_key = f"{job_id}::__uptime"
                 last_run_str = state.get(state_key)
+                run_day = periods.get("run_day")
+                run_time = periods.get("run_time")
 
-                if should_run(last_run_str, period_td):
-                    now_run = datetime.now()
+                use_weekly_anchor = bool(run_day and run_time and period_td >= timedelta(days=7))
+                now_run = None
+
+                if use_weekly_anchor:
+                    target_dt = _get_weekly_target(run_day, run_time, now)
+                    last_run = datetime.fromisoformat(last_run_str) if last_run_str else None
+                    if now >= target_dt and (last_run is None or last_run < target_dt):
+                        now_run = target_dt
+                else:
+                    if should_run(last_run_str, period_td):
+                        now_run = datetime.now()
+
+                if now_run is not None:
                     win_start_raw = periods.get("uptime_window_start")
                     win_end_raw = periods.get("uptime_window_end")
-
-                    if win_start_raw and win_end_raw:
-                        win_start_str = str(win_start_raw).strip()
-                        win_end_str = str(win_end_raw).strip()
-                        if win_start_str == "full_last_month" and win_end_str == "full_last_month":
-                            start_date, end_date = get_previous_month_range()
-                        else:
-                            try:
-                                win_start_td = parse_period(win_start_raw)
-                                win_end_td = parse_period(win_end_raw)
-
-                                adj_start_td = win_start_td
-                                adj_end_td = win_end_td
-
-                                # Same weekly semantics as availability windows.
-                                if (
-                                    win_start_td >= timedelta(0)
-                                    and win_end_td >= timedelta(0)
-                                    and period_td >= timedelta(days=7)
-                                ):
-                                    adj_start_td = win_start_td - period_td
-                                    adj_end_td = win_end_td - period_td
-
-                                start_date = now_run + adj_start_td
-                                end_date = now_run + adj_end_td
-                            except Exception as e:
-                                print(f"[SKIP] Invalid uptime window for '{group_name_stripped}': {e}")
-                                start_date = None
-                                end_date = None
-                    else:
-                        # Default rolling window
-                        start_date, end_date = get_date_range_from_period(period_td)
+                    try:
+                        start_date, end_date = _compute_window(now_run, period_td, win_start_raw, win_end_raw)
+                    except Exception as e:
+                        print(f"[SKIP] Invalid uptime window for '{group_name_stripped}': {e}")
+                        start_date = end_date = None
 
                     if start_date and end_date and start_date < end_date:
                         device_group_id = name_to_id[group_name_stripped]
@@ -1043,8 +1082,3 @@ def run_scheduled_reports():
 
     # 5) Save updated state
     save_state(state)
-
-
-if __name__ == "__main__":
-    run_scheduled_reports()
-
