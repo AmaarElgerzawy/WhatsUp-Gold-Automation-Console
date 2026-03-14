@@ -59,7 +59,6 @@ def get_device_extra_data(device_ids):
     for row in cur.fetchall():
         data[row.nDeviceID] = {
             "Note": row.sNote,
-            "InterfaceAddress": row.InterfaceAddress
         }
 
     cur.close()
@@ -208,20 +207,19 @@ def write_excel(group_name, rows, start_date, end_date):
     for r in rows:
         ws.cell(r_idx, 1, r["Device"]).border = border
         ws.cell(r_idx, 2, r["Address"]).border = border
-        ws.cell(r_idx, 3, r["InterfaceAddress"]).border = border
-        ws.cell(r_idx, 4, r["Note"]).border = border
+        ws.cell(r_idx, 3, r["Note"]).border = border
 
-        for col, key in [(5,"Up"),(7,"Maintenance"),(9,"Unknown"),(11,"Down")]:
+        for col, key in [(4,"Up"),(6,"Maintenance"),(8,"Unknown"),(10,"Down")]:
             c = ws.cell(r_idx, col, r[key] / 100)
             c.number_format = "0.0000000%"
             c.alignment = right
             c.border = border
 
-        ws.cell(r_idx, 6, r["UpDuration"])
-        ws.cell(r_idx, 8, r["MaintenanceDuration"])
-        ws.cell(r_idx, 10, r["UnknownDuration"])
-        ws.cell(r_idx, 12, r["DownDuration"])
-        ws.cell(r_idx, 13, r["TotalDuration"])
+        ws.cell(r_idx, 5, r["UpDuration"])
+        ws.cell(r_idx, 7, r["MaintenanceDuration"])
+        ws.cell(r_idx, 9, r["UnknownDuration"])
+        ws.cell(r_idx, 11, r["DownDuration"])
+        ws.cell(r_idx, 12, r["TotalDuration"])
 
         r_idx += 1
 
