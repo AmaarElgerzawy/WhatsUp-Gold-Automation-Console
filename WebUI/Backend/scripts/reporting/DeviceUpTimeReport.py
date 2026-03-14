@@ -102,6 +102,8 @@ EXEC dbo.spGroupDeviceUptime
     @nRowCount           = '32767',
     @bAllPages           = 1;
 
+SELECT * FROM [{pivot_table}];
+
 IF OBJECT_ID(@PivotTable,'U') IS NOT NULL
 BEGIN
     EXEC('DROP TABLE ' + @PivotTable);
