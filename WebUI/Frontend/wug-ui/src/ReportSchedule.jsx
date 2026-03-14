@@ -10,18 +10,20 @@ export default function ReportSchedule() {
   const [gridApi, setGridApi] = useState(null);
   const [newCol, setNewCol] = useState("");
   const [showDialog, setShowDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState("simple"); // simple | weeklyWindow
+  const [dialogMode, setDialogMode] = useState("weekly");
   const [dialogGroup, setDialogGroup] = useState("");
-  const [dialogReportType, setDialogReportType] = useState("both"); // availability | uptime | both
-  const [dialogEvery, setDialogEvery] = useState(1);
-  const [dialogUnit, setDialogUnit] = useState("d"); // m, h, d, w
-  const [simpleWindowPreset, setSimpleWindowPreset] = useState("match"); // match | last_24h | last_7d | last_30d
-  const [runDay, setRunDay] = useState("mon");
+  const [runDay, setRunDay] = useState("sun");
   const [runTime, setRunTime] = useState("10:00");
   const [windowFromDay, setWindowFromDay] = useState("fri");
   const [windowFromTime, setWindowFromTime] = useState("00:00");
   const [windowToDay, setWindowToDay] = useState("sun");
-  const [windowToTime, setWindowToTime] = useState("23:59");
+  const [windowToTime, setWindowToTime] = useState("02:00");
+  // Monthly trigger
+  const [runDayOfMonth, setRunDayOfMonth] = useState(1);
+  const [periodStartDay, setPeriodStartDay] = useState(1);
+  const [periodEndDay, setPeriodEndDay] = useState(5);
+  const [periodStartTime, setPeriodStartTime] = useState("00:00");
+  const [periodEndTime, setPeriodEndTime] = useState("23:59");
 
   useEffect(() => {
     apiCall("reports/schedule")
@@ -32,17 +34,17 @@ export default function ReportSchedule() {
         return res.json();
       })
       .then((data) => {
-        // Known core scheduling fields in preferred order
+        // type: "weekly" | "monthly", group, then mode-specific fields
         const coreFields = [
           "group",
+          "type",
           "run_day",
           "run_time",
-          "availability_period",
-          "availability_window_start",
-          "availability_window_end",
-          "uptime_period",
-          "uptime_window_start",
-          "uptime_window_end",
+          "period_start_day",
+          "period_start_time",
+          "period_end_day",
+          "period_end_time",
+          "run_day_of_month",
         ];
 
         // Columns returned from backend (JSON schedule or legacy)
@@ -61,22 +63,22 @@ export default function ReportSchedule() {
             switch (field) {
               case "group":
                 return "Group name";
+              case "type":
+                return "Schedule type (weekly | monthly)";
               case "run_day":
-                return "Run day (weekly mode)";
+                return "Run day (weekday, weekly)";
               case "run_time":
                 return "Run time (HH:MM)";
-              case "availability_period":
-                return "Availability period (e.g. 1d, 1w)";
-              case "availability_window_start":
-                return "Availability window start offset";
-              case "availability_window_end":
-                return "Availability window end offset";
-              case "uptime_period":
-                return "Uptime period (e.g. 1d, 1w)";
-              case "uptime_window_start":
-                return "Uptime window start offset";
-              case "uptime_window_end":
-                return "Uptime window end offset";
+              case "period_start_day":
+                return "Period start day (weekday or day of month)";
+              case "period_start_time":
+                return "Period start time";
+              case "period_end_day":
+                return "Period end day (weekday or day of month)";
+              case "period_end_time":
+                return "Period end time";
+              case "run_day_of_month":
+                return "Run day of month (1–31, monthly)";
               default:
                 return field;
             }
@@ -205,22 +207,24 @@ export default function ReportSchedule() {
             alignItems: "center",
           }}
         >
+          
           <button
             type="button"
             className="button"
             onClick={() => {
               setDialogGroup("");
-              setDialogReportType("both");
-              setDialogEvery(1);
-              setDialogUnit("d");
-              setSimpleWindowPreset("match");
-              setDialogMode("simple");
-              setRunDay("mon");
+              setDialogMode("weekly");
+              setRunDay("sun");
               setRunTime("10:00");
               setWindowFromDay("fri");
               setWindowFromTime("00:00");
               setWindowToDay("sun");
-              setWindowToTime("23:59");
+              setWindowToTime("02:00");
+              setRunDayOfMonth(1);
+              setPeriodStartDay(1);
+              setPeriodEndDay(5);
+              setPeriodStartTime("00:00");
+              setPeriodEndTime("23:59");
               setShowDialog(true);
             }}
           >
@@ -311,11 +315,10 @@ export default function ReportSchedule() {
               New report schedule
             </h3>
             <p className="card-subtitle" style={{ marginBottom: 16 }}>
-              Choose group, report type, and either a simple interval or an
-              exact weekly window (e.g. Monday 10:00 to Friday 10:00).
+              Trigger &amp; window: run on a specific day and time; data window is
+              relative to run (weekly) or previous month (monthly).
             </p>
 
-            {/* Mode toggle */}
             <div
               style={{
                 display: "flex",
@@ -327,21 +330,21 @@ export default function ReportSchedule() {
                 type="button"
                 className={
                   "button" +
-                  (dialogMode === "simple" ? " button--primary" : "")
+                  (dialogMode === "weekly" ? " button--primary" : "")
                 }
-                onClick={() => setDialogMode("simple")}
+                onClick={() => setDialogMode("weekly")}
               >
-                Simple interval
+                Weekly
               </button>
               <button
                 type="button"
                 className={
                   "button" +
-                  (dialogMode === "weeklyWindow" ? " button--primary" : "")
+                  (dialogMode === "monthly" ? " button--primary" : "")
                 }
-                onClick={() => setDialogMode("weeklyWindow")}
+                onClick={() => setDialogMode("monthly")}
               >
-                Weekly window
+                Monthly
               </button>
             </div>
 
@@ -355,85 +358,7 @@ export default function ReportSchedule() {
               />
             </div>
 
-            <div className="form-group" style={{ marginTop: 12 }}>
-              <label className="form-label">Report type</label>
-              <select
-                className="select"
-                value={dialogReportType}
-                onChange={(e) => setDialogReportType(e.target.value)}
-              >
-                <option value="availability">Availability only</option>
-                <option value="uptime">Device Uptime only</option>
-                <option value="both">Both (Availability + Uptime)</option>
-              </select>
-            </div>
-
-            {dialogMode === "simple" && (
-              <div
-                className="form-group"
-                style={{
-                  marginTop: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <label className="form-label">Every</label>
-                    <input
-                      className="input"
-                      type="number"
-                      min={1}
-                      value={dialogEvery}
-                      onChange={(e) =>
-                        setDialogEvery(
-                          Number.isNaN(parseInt(e.target.value, 10))
-                            ? 1
-                            : Math.max(1, parseInt(e.target.value, 10))
-                        )
-                      }
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label className="form-label">Unit</label>
-                  <select
-                    className="select"
-                    value={dialogUnit}
-                    onChange={(e) => setDialogUnit(e.target.value)}
-                  >
-                    <option value="m">Minutes</option>
-                    <option value="h">Hours</option>
-                    <option value="d">Days</option>
-                    <option value="w">Weeks</option>
-                  </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">
-                    Report period (data window)
-                  </label>
-                  <select
-                    className="select"
-                    value={simpleWindowPreset}
-                    onChange={(e) => setSimpleWindowPreset(e.target.value)}
-                  >
-                    <option value="match">
-                      Match schedule interval (rolling window)
-                    </option>
-                    <option value="last_24h">Last 24 hours</option>
-                    <option value="last_7d">Last 7 days</option>
-                    <option value="last_30d">Last 30 days</option>
-                    <option value="full_last_month">
-                      Full last month (1st to last day)
-                    </option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {dialogMode === "weeklyWindow" && (
+            {dialogMode === "weekly" && (
               <div style={{ marginTop: 12 }}>
                 <div
                   className="form-group"
@@ -530,6 +455,98 @@ export default function ReportSchedule() {
               </div>
             )}
 
+            {dialogMode === "monthly" && (
+              <div style={{ marginTop: 12 }}>
+                <div
+                  className="form-group"
+                  style={{ display: "flex", gap: 8, marginBottom: 8 }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Run on day of month (1–31)</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={runDayOfMonth}
+                      onChange={(e) =>
+                        setRunDayOfMonth(
+                          Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1))
+                        )
+                      }
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Run at (time)</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={runTime}
+                      onChange={(e) => setRunTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div
+                  className="form-group"
+                  style={{ display: "flex", gap: 8, marginBottom: 8 }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Data window: start day (prev month, 1–31)</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={periodStartDay}
+                      onChange={(e) =>
+                        setPeriodStartDay(
+                          Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1))
+                        )
+                      }
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Data window: end day (prev month, 1–31)</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={periodEndDay}
+                      onChange={(e) =>
+                        setPeriodEndDay(
+                          Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1))
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                <div
+                  className="form-group"
+                  style={{ display: "flex", gap: 8 }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Window start time</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={periodStartTime}
+                      onChange={(e) => setPeriodStartTime(e.target.value)}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label">Window end time</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={periodEndTime}
+                      onChange={(e) => setPeriodEndTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div
               style={{
                 marginTop: 20,
@@ -556,130 +573,26 @@ export default function ReportSchedule() {
 
                   const base = { group: dialogGroup.trim() };
 
-                  if (dialogMode === "simple") {
-                    const period = `${dialogEvery}${dialogUnit}`;
-
-                    if (
-                      dialogReportType === "availability" ||
-                      dialogReportType === "both"
-                    ) {
-                      base.availability_period = period;
-                    }
-                    if (
-                      dialogReportType === "uptime" ||
-                      dialogReportType === "both"
-                    ) {
-                      base.uptime_period = period;
-                    }
-
-                    // Optional explicit data window for simple interval
-                    let winStart = null;
-                    let winEnd = null;
-                    if (simpleWindowPreset === "last_24h") {
-                      winStart = "-24h";
-                      winEnd = "0h";
-                    } else if (simpleWindowPreset === "last_7d") {
-                      winStart = "-7d";
-                      winEnd = "0h";
-                    } else if (simpleWindowPreset === "last_30d") {
-                      winStart = "-30d";
-                      winEnd = "0h";
-                    } else if (simpleWindowPreset === "full_last_month") {
-                      winStart = "full_last_month";
-                      winEnd = "full_last_month";
-                    }
-
-                    if (winStart && winEnd) {
-                      if (
-                        dialogReportType === "availability" ||
-                        dialogReportType === "both"
-                      ) {
-                        base.availability_window_start = winStart;
-                        base.availability_window_end = winEnd;
-                      }
-                      if (
-                        dialogReportType === "uptime" ||
-                        dialogReportType === "both"
-                      ) {
-                        base.uptime_window_start = winStart;
-                        base.uptime_window_end = winEnd;
-                      }
-                    }
-                  } else if (dialogMode === "weeklyWindow") {
-                    // Helper to map day -> index (Mon=0)
-                    const dayIndex = (d) => {
-                      const map = {
-                        mon: 0,
-                        tue: 1,
-                        wed: 2,
-                        thu: 3,
-                        fri: 4,
-                        sat: 5,
-                        sun: 6,
-                      };
-                      return map[d] ?? 0;
-                    };
-
-                    const toMinutes = (day, time) => {
-                      const [h, m] = time.split(":").map((v) => parseInt(v, 10));
-                      const hour = Number.isNaN(h) ? 0 : h;
-                      const minute = Number.isNaN(m) ? 0 : m;
-                      return dayIndex(day) * 24 * 60 + hour * 60 + minute;
-                    };
-
-                    const wrapDiffToPreviousWeek = (targetMinutes, runMinutes) => {
-                      const weekMinutes = 7 * 24 * 60;
-                      let diff = targetMinutes - runMinutes;
-                      if (diff > 0) {
-                        diff -= weekMinutes;
-                      }
-                      return diff;
-                    };
-
-                    const runMinutes = toMinutes(runDay, runTime);
-                    const fromMinutes = toMinutes(windowFromDay, windowFromTime);
-                    const toMinutesVal = toMinutes(windowToDay, windowToTime);
-
-                    const diffToToken = (minutesDiff) => {
-                      if (minutesDiff % 60 === 0) {
-                        const hours = minutesDiff / 60;
-                        return `${hours}h`;
-                      }
-                      return `${minutesDiff}m`;
-                    };
-
-                    const startDiff = wrapDiffToPreviousWeek(
-                      fromMinutes,
-                      runMinutes
-                    );
-                    const endDiff = wrapDiffToPreviousWeek(toMinutesVal, runMinutes);
-
-                    if (endDiff <= startDiff) {
-                      alert(
-                        "Window end must be after window start relative to the run time. Adjust the days/times so the period runs before (or up to) the run."
-                      );
+                  if (dialogMode === "weekly") {
+                    base.type = "weekly";
+                    base.run_day = runDay;
+                    base.run_time = runTime;
+                    base.period_start_day = windowFromDay;
+                    base.period_start_time = windowFromTime;
+                    base.period_end_day = windowToDay;
+                    base.period_end_time = windowToTime;
+                  } else if (dialogMode === "monthly") {
+                    if (periodEndDay < periodStartDay) {
+                      alert("Period end day must be >= start day.");
                       return;
                     }
-
-                    // Weekly cadence
-                    const period = "1w";
-
-                    if (
-                      dialogReportType === "availability" ||
-                      dialogReportType === "both"
-                    ) {
-                      base.availability_period = period;
-                      base.availability_window_start = diffToToken(startDiff);
-                      base.availability_window_end = diffToToken(endDiff);
-                    }
-                    if (
-                      dialogReportType === "uptime" ||
-                      dialogReportType === "both"
-                    ) {
-                      base.uptime_period = period;
-                      base.uptime_window_start = diffToToken(startDiff);
-                      base.uptime_window_end = diffToToken(endDiff);
-                    }
+                    base.type = "monthly";
+                    base.run_day_of_month = runDayOfMonth;
+                    base.run_time = runTime;
+                    base.period_start_day = periodStartDay;
+                    base.period_start_time = periodStartTime;
+                    base.period_end_day = periodEndDay;
+                    base.period_end_time = periodEndTime;
                   }
 
                   setRows((prev) => [...prev, base]);
