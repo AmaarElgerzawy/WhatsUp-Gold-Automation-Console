@@ -24,6 +24,7 @@ export default function ReportSchedule() {
   const [periodEndDay, setPeriodEndDay] = useState(5);
   const [periodStartTime, setPeriodStartTime] = useState("00:00");
   const [periodEndTime, setPeriodEndTime] = useState("23:59");
+  const [reportType, setReportType] = useState("both"); // "availability" | "uptime" | "both"
 
   useEffect(() => {
     apiCall("reports/schedule")
@@ -38,6 +39,7 @@ export default function ReportSchedule() {
         const coreFields = [
           "group",
           "type",
+          "report_type",
           "run_day",
           "run_time",
           "period_start_day",
@@ -65,6 +67,8 @@ export default function ReportSchedule() {
                 return "Group name";
               case "type":
                 return "Schedule type (weekly | monthly)";
+              case "report_type":
+                return "Reports (availability | uptime | both)";
               case "run_day":
                 return "Run day (weekday, weekly)";
               case "run_time":
@@ -225,6 +229,7 @@ export default function ReportSchedule() {
               setPeriodEndDay(5);
               setPeriodStartTime("00:00");
               setPeriodEndTime("23:59");
+              setReportType("both");
               setShowDialog(true);
             }}
           >
@@ -356,6 +361,19 @@ export default function ReportSchedule() {
                 value={dialogGroup}
                 onChange={(e) => setDialogGroup(e.target.value)}
               />
+            </div>
+
+            <div className="form-group" style={{ marginTop: 12 }}>
+              <label className="form-label">Reports to run</label>
+              <select
+                className="select"
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+              >
+                <option value="availability">Availability report only</option>
+                <option value="uptime">Uptime report only</option>
+                <option value="both">Both reports</option>
+              </select>
             </div>
 
             {dialogMode === "weekly" && (
@@ -571,7 +589,10 @@ export default function ReportSchedule() {
                     return;
                   }
 
-                  const base = { group: dialogGroup.trim() };
+                  const base = {
+                    group: dialogGroup.trim(),
+                    report_type: reportType,
+                  };
 
                   if (dialogMode === "weekly") {
                     base.type = "weekly";
