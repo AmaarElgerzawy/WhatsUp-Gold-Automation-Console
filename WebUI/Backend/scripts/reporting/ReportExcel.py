@@ -1,7 +1,8 @@
-import pyodbc
+import calendar
 import json
 import os
-from datetime import datetime, timedelta
+import pyodbc
+from datetime import datetime, timedelta, timezone
 from openpyxl.utils import get_column_letter
 from pathlib import Path
 from openpyxl import Workbook
@@ -129,18 +130,6 @@ def send_single_report_email(group_name, report_path, start_date, end_date):
     except Exception as e:
         print(f"[EMAIL] ERROR sending email via Resend for group {group_name}: {e}")
 
-def get_date_range_from_period(period_td):
-    end = datetime.now()
-    start = end - period_td
-    return start, end
-
-def should_run(last_run_str, period_td):
-    if last_run_str is None:
-        return True
-
-    last_run = datetime.fromisoformat(last_run_str)
-    return datetime.now() - last_run >= period_td
-
 def load_state():
     if not os.path.exists(STATE_FILE):
         return {}
@@ -151,66 +140,129 @@ def save_state(state):
     with open(STATE_FILE, "w") as f:
         json.dump(state, f)
 
-def parse_period(period: str) -> timedelta:
+# ---------- Simple scheduler: weekly or monthly ----------
+# Use consistent time: set TZ env for server so "run_time" is unambiguous (or use UTC below).
+def _scheduler_now() -> datetime:
+    return datetime.now()
+
+
+def _parse_time(s: str):
+    """Parse 'HH:MM' or 'HH:MM:SS' -> (hour, minute)."""
+    s = (s or "00:00").strip()
+    parts = s.split(":")
+    h = int(parts[0]) if parts else 0
+    m = int(parts[1]) if len(parts) > 1 else 0
+    return h, m
+
+
+def _weekday_index(day_code: str) -> int:
+    """Map 'mon'..'sun' to Python weekday (Mon=0)."""
+    code = (day_code or "").strip().lower()
+    mapping = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+    return mapping.get(code, 0)
+
+
+def _trigger_fires(job: dict, now: datetime, last_run_iso: str) -> tuple[bool, datetime | None]:
     """
-    Parse a simple duration string like:
-      "1d" (days), "2w" (weeks), "6h" (hours), "30m" (minutes)
-    Used both for:
-      - schedule intervals (how often to run)
-      - window offsets (relative to run time) when negative values are used.
+    Simple trigger: weekly = today is run_day and time >= run_time; monthly = today is run_day_of_month and time >= run_time.
+    Returns (should_run, anchor_datetime).
     """
-    period = str(period).strip()
-    if not period:
-        raise ValueError("Empty period")
+    schedule_type = (job.get("type") or "weekly").strip().lower()
+    run_time_str = job.get("run_time") or "00:00"
+    h, m = _parse_time(run_time_str)
+    anchor = now.replace(hour=h, minute=m, second=0, microsecond=0)
 
-    num = int(period[:-1])
-    unit = period[-1]
+    if schedule_type == "monthly":
+        try:
+            day_of_month = int(job.get("run_day_of_month") or 0)
+        except (ValueError, TypeError):
+            return False, None
+        if day_of_month < 1 or now.day != day_of_month:
+            return False, None
+        if now < anchor:
+            return False, anchor
+        if last_run_iso:
+            try:
+                last_run = datetime.fromisoformat(last_run_iso)
+                if last_run >= anchor:
+                    return False, anchor
+            except Exception:
+                pass
+        return True, anchor
 
-    if unit == "d":
-        return timedelta(days=num)
-    if unit == "w":
-        return timedelta(weeks=num)
-    if unit == "h":
-        return timedelta(hours=num)
-    if unit == "m":
-        return timedelta(minutes=num)
+    # weekly: run_day = weekday (mon..sun)
+    run_day = job.get("run_day")
+    if not run_day:
+        return False, None
+    wd = _weekday_index(str(run_day))
+    if now.weekday() != wd:
+        return False, None
+    if now < anchor:
+        return False, anchor
+    if last_run_iso:
+        try:
+            last_run = datetime.fromisoformat(last_run_iso)
+            if last_run >= anchor:
+                return False, anchor
+        except Exception:
+            pass
+    return True, anchor
 
-    raise ValueError("Invalid period: " + period)
+
+def _compute_window_from_trigger(anchor_dt: datetime, job: dict) -> tuple[datetime, datetime]:
+    """
+    Compute report data window.
+    - Weekly: last week (week containing run date). period_start_day/weekday at period_start_time -> period_end_day/weekday at period_end_time.
+    - Monthly: previous month. period_start_day (1-31) at period_start_time -> period_end_day at period_end_time.
+    """
+    schedule_type = (job.get("type") or "weekly").strip().lower()
+    run_date = anchor_dt.date()
+
+    if schedule_type == "monthly":
+        if run_date.month == 1:
+            prev_first = run_date.replace(year=run_date.year - 1, month=12, day=1)
+        else:
+            prev_first = run_date.replace(month=run_date.month - 1, day=1)
+        _, last_day = calendar.monthrange(prev_first.year, prev_first.month)
+        start_d = min(int(job.get("period_start_day") or 1), last_day)
+        end_d = min(int(job.get("period_end_day") or last_day), last_day)
+        start_d = max(1, start_d)
+        end_d = max(start_d, end_d)
+        sh, sm = _parse_time(job.get("period_start_time") or "00:00")
+        eh, em = _parse_time(job.get("period_end_time") or "23:59")
+        start_dt = datetime(prev_first.year, prev_first.month, start_d, sh, sm, 0, 0)
+        end_dt = datetime(prev_first.year, prev_first.month, end_d, eh, em, 59, 999999)
+        return start_dt, end_dt
+
+    # weekly: LAST week (week before run_date). period_*_day = weekday code (mon..sun).
+    last_week_start = run_date - timedelta(days=run_date.weekday() + 7)
+    start_wd = _weekday_index(str(job.get("period_start_day") or "mon"))
+    end_wd = _weekday_index(str(job.get("period_end_day") or "sun"))
+    start_date = last_week_start + timedelta(days=start_wd)
+    end_date = last_week_start + timedelta(days=end_wd)
+    sh, sm = _parse_time(job.get("period_start_time") or "00:00")
+    eh, em = _parse_time(job.get("period_end_time") or "23:59")
+    start_dt = datetime(start_date.year, start_date.month, start_date.day, sh, sm, 0, 0)
+    end_dt = datetime(end_date.year, end_date.month, end_date.day, eh, em, 59, 999999)
+    return start_dt, end_dt
+
 
 def load_schedule_config():
     """
-    Load scheduling configuration from the JSON file produced by the API.
-
-    Shape in JSON (report_schedule.json):
-      {
-        "columns": [...],
-        "rows": [
-          {
-            "group": "...",
-            "availability_period": "1w",
-            "availability_window_start": "-73h",
-            "availability_window_end": "-25h",
-            "uptime_period": "1w",
-            "uptime_window_start": "-73h",
-            "uptime_window_end": "-25h",
-            ...
-          },
-          ...
-        ]
-      }
-
-    This function no longer reads from the legacy Excel sheet; all
-    scheduling is driven by JSON so frontend and backend stay in sync.
+    Load schedule from report_schedule.json. Simple two-mode model:
+    - type: "weekly" | "monthly", group, report_type: "availability" | "uptime" | "both"
+    - Weekly: run_day, run_time, period_start_day, period_start_time, period_end_day, period_end_time
+    - Monthly: run_day_of_month, run_time, period_start_day, period_start_time, period_end_day, period_end_time
     """
     if not os.path.exists(SCHEDULE_JSON_FILE):
-        return {}
+        return []
 
     with open(SCHEDULE_JSON_FILE, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
     rows = raw.get("rows", [])
     if not isinstance(rows, list) or not rows:
-        return {}
+        return []
 
     def _clean(v):
         if v is None:
@@ -219,43 +271,43 @@ def load_schedule_config():
         return s if s else None
 
     jobs = []
-
     for row in rows:
         if not isinstance(row, dict):
             continue
-
         job_id = _clean(row.get("id"))
         group_name = _clean(row.get("group"))
         if not group_name:
             continue
 
+        schedule_type = _clean(row.get("type")) or "weekly"
+        report_type = _clean(row.get("report_type")) or "both"
         entry = {
             "id": job_id,
             "group": group_name,
+            "type": schedule_type,
+            "report_type": report_type,
             "run_day": _clean(row.get("run_day")),
             "run_time": _clean(row.get("run_time")),
-            "availability_period": _clean(row.get("availability_period") or row.get("availability")),
-            "uptime_period": _clean(row.get("uptime_period") or row.get("uptime")),
-            "availability_window_start": _clean(row.get("availability_window_start")),
-            "availability_window_end": _clean(row.get("availability_window_end")),
-            "uptime_window_start": _clean(row.get("uptime_window_start")),
-            "uptime_window_end": _clean(row.get("uptime_window_end")),
+            "period_start_day": row.get("period_start_day"),
+            "period_start_time": _clean(row.get("period_start_time")),
+            "period_end_day": row.get("period_end_day"),
+            "period_end_time": _clean(row.get("period_end_time")),
+            "run_day_of_month": row.get("run_day_of_month"),
         }
+        if schedule_type == "monthly":
+            try:
+                entry["run_day_of_month"] = int(entry.get("run_day_of_month") or 1)
+            except (ValueError, TypeError):
+                entry["run_day_of_month"] = 1
+            for k in ("period_start_day", "period_end_day"):
+                try:
+                    entry[k] = int(entry.get(k) or 1)
+                except (ValueError, TypeError):
+                    entry[k] = 1
 
-        # Legacy single period (if someone still sends it)
-        legacy_period = _clean(row.get("period"))
-        if legacy_period:
-            entry["availability_period"] = entry["availability_period"] or legacy_period
-            entry["uptime_period"] = entry["uptime_period"] or legacy_period
-
-        # Drop empty keys
         entry = {k: v for k, v in entry.items() if v is not None}
-
         if "id" not in entry:
-            # Stable ids are generated by the API on save; if missing we still
-            # run the job, but state tracking will fall back to group+index.
             entry["id"] = None
-
         jobs.append(entry)
 
     return jobs
@@ -803,112 +855,6 @@ def get_previous_month_range():
     return first_prev_month, first_this_month
 
 
-def _weekday_index(day_code: str) -> int:
-    """
-    Map a short day code like 'mon', 'tue', ... to Python weekday index (Mon=0).
-    """
-    code = (day_code or "").strip().lower()
-    mapping = {
-        "mon": 0,
-        "tue": 1,
-        "wed": 2,
-        "thu": 3,
-        "fri": 4,
-        "sat": 5,
-        "sun": 6,
-    }
-    return mapping.get(code, 0)
-
-
-def _get_weekly_target(run_day: str, run_time: str, now: datetime) -> datetime:
-    """
-    Given a run day code (mon..sun) and HH:MM time, return the scheduled
-    datetime for the current week. Jobs will execute once when 'now' passes
-    this target and when the last_run stored in state is older than it.
-    """
-    wd_target = _weekday_index(run_day)
-    try:
-        hour, minute = map(int, (run_time or "00:00").split(":", 1))
-    except ValueError:
-        hour, minute = 0, 0
-
-    days_ahead = wd_target - now.weekday()
-    target_date = (now + timedelta(days=days_ahead)).date()
-    return datetime(
-        year=target_date.year,
-        month=target_date.month,
-        day=target_date.day,
-        hour=hour,
-        minute=minute,
-        second=0,
-        microsecond=0,
-    )
-
-
-def _should_run_weekly_anchor(last_run_str: str, run_day: str, run_time: str, now: datetime) -> tuple[bool, datetime]:
-    """
-    Strict weekly anchor:
-    - Only run on the configured weekday (e.g. Friday).
-    - Only run at/after the configured time on that day.
-    - Only run once per anchor timestamp (based on state last_run).
-
-    Returns (should_run, anchor_datetime_for_today).
-    """
-    target_wd = _weekday_index(run_day)
-
-    # Must be the configured day
-    if now.weekday() != target_wd:
-        return False, None
-
-    # Anchor is "today at HH:MM"
-    try:
-        hour, minute = map(int, (run_time or "00:00").split(":", 1))
-    except ValueError:
-        hour, minute = 0, 0
-
-    anchor_dt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
-    # Must be at/after the configured time
-    if now < anchor_dt:
-        return False, anchor_dt
-
-    # Must not have already run for this anchor
-    if last_run_str:
-        try:
-            last_run = datetime.fromisoformat(last_run_str)
-            if last_run >= anchor_dt:
-                return False, anchor_dt
-        except Exception:
-            # If state is corrupted, allow run (and it will be rewritten)
-            pass
-
-    return True, anchor_dt
-
-
-def _compute_window(now_run: datetime, period_td: timedelta, win_start_raw, win_end_raw):
-    """
-    Compute [start_date, end_date] for a job given the base run time and window
-    offsets. Supports special 'full_last_month' preset.
-    """
-    if win_start_raw and win_end_raw:
-        win_start_str = str(win_start_raw).strip()
-        win_end_str = str(win_end_raw).strip()
-
-        if win_start_str == "full_last_month" and win_end_str == "full_last_month":
-            return get_previous_month_range()
-
-        # Treat as relative offsets from the run time
-        win_start_td = parse_period(win_start_raw)
-        win_end_td = parse_period(win_end_raw)
-        start_date = now_run + win_start_td
-        end_date = now_run + win_end_td
-        return start_date, end_date
-
-    # Default rolling window: [run_time - period, run_time]
-    end = now_run
-    start = end - period_td
-    return start, end
-
 def run_scheduled_reports():
     """
     Execute all due scheduled reports based on the Excel configuration
@@ -945,7 +891,7 @@ def run_scheduled_reports():
             del state[k]
     # --- Monthly all-groups run (once per month) ---
     last_monthly_str = state.get("__MONTHLY_ALL__")
-    now = datetime.now()
+    now = _scheduler_now()
     do_monthly = False
 
     if last_monthly_str is None:
@@ -985,138 +931,89 @@ def run_scheduled_reports():
     groups = get_device_groups()        # returns list of (id, name)
     name_to_id = {name: gid for gid, name in groups}
 
-    # 3) Loop on each schedule row (job)
+    # 3) Trigger-based loop: one run per job when trigger fires, same window for both reports
     for idx, job in enumerate(jobs):
         group_name_stripped = (job.get("group") or "").strip()
         job_id = (job.get("id") or "").strip() or f"{group_name_stripped}::__idx_{idx}"
-        periods = job
 
         if group_name_stripped not in name_to_id:
             print(f"[SKIP] Config group '{group_name_stripped}' not found in DeviceGroup table")
             continue
+        st = (job.get("type") or "weekly").strip().lower()
+        if st == "monthly" and job.get("run_day_of_month") is None:
+            print(f"[SKIP] Job '{group_name_stripped}' (monthly) missing run_day_of_month")
+            continue
+        if st == "weekly" and not job.get("run_day"):
+            print(f"[SKIP] Job '{group_name_stripped}' (weekly) missing run_day")
+            continue
+        if not job.get("run_time"):
+            print(f"[SKIP] Job '{group_name_stripped}' missing run_time")
+            continue
 
-        # Per‑report scheduling; each report type has its own period
-        # and last‑run marker so they can be configured independently.
+        state_key = f"{job_id}::__last_run"
+        last_run_iso = state.get(state_key)
+        should_run, anchor_dt = _trigger_fires(job, now, last_run_iso)
+        if not should_run or anchor_dt is None:
+            continue
 
-        # ===== Report 1: Active Monitor Availability =====
-        availability_period = periods.get("availability_period")
-        if availability_period:
+        try:
+            start_date, end_date = _compute_window_from_trigger(anchor_dt, job)
+        except Exception as e:
+            print(f"[SKIP] Window computation for '{group_name_stripped}': {e}")
+            continue
+        if start_date >= end_date:
+            print(f"[SKIP] Invalid window for '{group_name_stripped}': start >= end")
+            continue
+
+        device_group_id = name_to_id[group_name_stripped]
+        run_reports = (job.get("report_type") or "both").strip().lower()
+
+        # Report 1: Active Monitor Availability (if requested)
+        if run_reports in ("availability", "both"):
             try:
-                period_td = parse_period(availability_period)
+                print(f"[RUN] Availability for {group_name_stripped}: {start_date} -> {end_date}")
+                availability_report_path = write_excel_for_group(
+                    device_group_id=device_group_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    group_name=group_name_stripped,
+                )
+                send_single_report_email(
+                    group_name=group_name_stripped,
+                    report_path=availability_report_path,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
             except Exception as e:
-                print(f"[SKIP] Invalid availability_period '{availability_period}' for group '{group_name_stripped}': {e}")
-            else:
-                state_key = f"{job_id}::__availability"
-                last_run_str = state.get(state_key)
-                run_day = periods.get("run_day")
-                run_time = periods.get("run_time")
+                print(f"[ERROR] Availability report for '{group_name_stripped}': {e}")
 
-                use_weekly_anchor = bool(run_day and run_time and period_td >= timedelta(days=7))
-                now_run = None
-
-                if use_weekly_anchor:
-                    should_run_anchor, anchor_dt = _should_run_weekly_anchor(last_run_str, run_day, run_time, now)
-                    if should_run_anchor:
-                        now_run = anchor_dt
-                else:
-                    if should_run(last_run_str, period_td):
-                        now_run = datetime.now()
-
-                if now_run is not None:
-                    win_start_raw = periods.get("availability_window_start")
-                    win_end_raw = periods.get("availability_window_end")
-                    try:
-                        start_date, end_date = _compute_window(now_run, period_td, win_start_raw, win_end_raw)
-                    except Exception as e:
-                        print(f"[SKIP] Invalid availability window for '{group_name_stripped}': {e}")
-                        start_date = end_date = None
-
-                    if start_date and end_date and start_date < end_date:
-                        device_group_id = name_to_id[group_name_stripped]
-                        print(f"[RUN] Availability for {group_name_stripped}: {start_date} -> {end_date}")
-                        try:
-                            availability_report_path = write_excel_for_group(
-                                device_group_id=device_group_id,
-                                start_date=start_date,
-                                end_date=end_date,
-                                group_name=group_name_stripped,
-                            )
-
-                            send_single_report_email(
-                                group_name=group_name_stripped,
-                                report_path=availability_report_path,
-                                start_date=start_date,
-                                end_date=end_date,
-                            )
-
-                            state[state_key] = now_run.replace(second=0, microsecond=0).isoformat()
-                        except Exception as e:
-                            print(f"[ERROR] while generating availability report for '{group_name_stripped}': {e}")
-
-        # ===== Report 2: Device Uptime (DeviceUpTimeReport) =====
-        uptime_period = periods.get("uptime_period")
-        if uptime_period:
+        # Report 2: Device Uptime (if requested)
+        if run_reports in ("uptime", "both"):
             try:
-                period_td = parse_period(uptime_period)
-            except Exception as e:
-                print(f"[SKIP] Invalid uptime_period '{uptime_period}' for group '{group_name_stripped}': {e}")
-            else:
-                state_key = f"{job_id}::__uptime"
-                last_run_str = state.get(state_key)
-                run_day = periods.get("run_day")
-                run_time = periods.get("run_time")
-
-                use_weekly_anchor = bool(run_day and run_time and period_td >= timedelta(days=7))
-                now_run = None
-
-                if use_weekly_anchor:
-                    should_run_anchor, anchor_dt = _should_run_weekly_anchor(last_run_str, run_day, run_time, now)
-                    if should_run_anchor:
-                        now_run = anchor_dt
+                print(f"[RUN] DeviceUpTime for {group_name_stripped}: {start_date} -> {end_date}")
+                uptime_rows = run_sp_group_device_uptime(
+                    device_group_id=device_group_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                if uptime_rows:
+                    uptime_report_path = write_uptime_excel(
+                        group_name_stripped,
+                        uptime_rows,
+                        start_date,
+                        end_date,
+                    )
+                    send_single_report_email(
+                        group_name=group_name_stripped,
+                        report_path=uptime_report_path,
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
                 else:
-                    if should_run(last_run_str, period_td):
-                        now_run = datetime.now()
+                    print(f"[RUN] No uptime data for '{group_name_stripped}' in window")
+            except Exception as e:
+                print(f"[ERROR] DeviceUpTime report for '{group_name_stripped}': {e}")
 
-                if now_run is not None:
-                    win_start_raw = periods.get("uptime_window_start")
-                    win_end_raw = periods.get("uptime_window_end")
-                    try:
-                        start_date, end_date = _compute_window(now_run, period_td, win_start_raw, win_end_raw)
-                    except Exception as e:
-                        print(f"[SKIP] Invalid uptime window for '{group_name_stripped}': {e}")
-                        start_date = end_date = None
+        state[state_key] = anchor_dt.replace(second=0, microsecond=0).isoformat()
 
-                    if start_date and end_date and start_date < end_date:
-                        device_group_id = name_to_id[group_name_stripped]
-                        print(f"[RUN] DeviceUpTime for {group_name_stripped}: {start_date} -> {end_date}")
-                        try:
-                            uptime_rows = run_sp_group_device_uptime(
-                                device_group_id=device_group_id,
-                                start_date=start_date,
-                                end_date=end_date,
-                            )
-
-                            if uptime_rows:
-                                uptime_report_path = write_uptime_excel(
-                                    group_name_stripped,
-                                    uptime_rows,
-                                    start_date,
-                                    end_date,
-                                )
-
-                                send_single_report_email(
-                                    group_name=group_name_stripped,
-                                    report_path=uptime_report_path,
-                                    start_date=start_date,
-                                    end_date=end_date,
-                                )
-                                state[state_key] = now_run.replace(second=0, microsecond=0).isoformat()
-                            else:
-                                print(f"[RUN] No uptime data for '{group_name_stripped}' in scheduled window (will retry next run)")
-                                # Do not update state so the job runs again next period
-                        except Exception as e:
-                            print(f"[ERROR] while generating DeviceUpTime report for '{group_name_stripped}': {e}")
-                            # Do not update state on error so it retries
-
-    # 5) Save updated state
     save_state(state)
