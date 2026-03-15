@@ -154,17 +154,6 @@ export default function Login({ onLogin }) {
             </button>
           </div>
         </form>
-
-        <div
-          style={{
-            marginTop: 20,
-            fontSize: 12,
-            color: "#9ca3af",
-            textAlign: "center",
-          }}
-        >
-          Default credentials: admin / admin
-        </div>
       </div>
     </div>
   );
