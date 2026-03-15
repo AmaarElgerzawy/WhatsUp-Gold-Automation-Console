@@ -170,11 +170,11 @@ def write_excel(group_name, rows, start_date, end_date):
     headers = [
         "Device",
         "Address",
-        "Note",
         "Up", "Up Duration",
         "Maintenance", "Maintenance Duration",
         "Unknown", "Unknown Duration",
         "Down", "Down Duration",
+        "Note",
         "Total Duration"
     ]
 
@@ -209,19 +209,19 @@ def write_excel(group_name, rows, start_date, end_date):
     for r in rows:
         ws.cell(r_idx, 1, r["Device"]).border = border
         ws.cell(r_idx, 2, r["Address"]).border = border
-        ws.cell(r_idx, 3, r["Note"]).border = border
 
-        for col, key in [(4,"Up"),(6,"Maintenance"),(8,"Unknown"),(10,"Down")]:
+        for col, key in [(3,"Up"),(5,"Maintenance"),(7,"Unknown"),(9,"Down")]:
             c = ws.cell(r_idx, col, r[key] / 100)
             c.number_format = "0.0000000%"
             c.alignment = right
             c.border = border
 
-        ws.cell(r_idx, 5, r["UpDuration"])
-        ws.cell(r_idx, 7, r["MaintenanceDuration"])
-        ws.cell(r_idx, 9, r["UnknownDuration"])
-        ws.cell(r_idx, 11, r["DownDuration"])
-        ws.cell(r_idx, 12, r["TotalDuration"])
+        ws.cell(r_idx, 4, r["UpDuration"])
+        ws.cell(r_idx, 6, r["MaintenanceDuration"])
+        ws.cell(r_idx, 8, r["UnknownDuration"])
+        ws.cell(r_idx, 10, r["DownDuration"])
+        ws.cell(r_idx, 11, r["TotalDuration"])
+        ws.cell(r_idx, 12, r["Note"]).border = border
 
         r_idx += 1
 
