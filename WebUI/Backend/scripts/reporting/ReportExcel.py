@@ -7,7 +7,6 @@ from openpyxl.utils import get_column_letter
 from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
 import resend
 from constants import (
     get_connection_string,
@@ -145,7 +144,6 @@ def save_state(state):
 def _scheduler_now() -> datetime:
     return datetime.now()
 
-
 def _parse_time(s: str):
     """Parse 'HH:MM' or 'HH:MM:SS' -> (hour, minute)."""
     s = (s or "00:00").strip()
@@ -154,13 +152,11 @@ def _parse_time(s: str):
     m = int(parts[1]) if len(parts) > 1 else 0
     return h, m
 
-
 def _weekday_index(day_code: str) -> int:
     """Map 'mon'..'sun' to Python weekday (Mon=0)."""
     code = (day_code or "").strip().lower()
     mapping = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
     return mapping.get(code, 0)
-
 
 def _trigger_fires(job: dict, now: datetime, last_run_iso: str) -> tuple[bool, datetime | None]:
     """
@@ -208,7 +204,6 @@ def _trigger_fires(job: dict, now: datetime, last_run_iso: str) -> tuple[bool, d
             pass
     return True, anchor
 
-
 def _compute_window_from_trigger(anchor_dt: datetime, job: dict) -> tuple[datetime, datetime]:
     """
     Compute report data window.
@@ -234,12 +229,12 @@ def _compute_window_from_trigger(anchor_dt: datetime, job: dict) -> tuple[dateti
         end_dt = datetime(prev_first.year, prev_first.month, end_d, eh, em, 59, 999999)
         return start_dt, end_dt
 
-    # weekly: LAST week (week before run_date). period_*_day = weekday code (mon..sun).
-    last_week_start = run_date - timedelta(days=run_date.weekday() + 7)
+    # weekly: same week as run_date (Mon–Sun containing the run day). period_*_day = weekday code (mon..sun).
+    week_start = run_date - timedelta(days=run_date.weekday())
     start_wd = _weekday_index(str(job.get("period_start_day") or "mon"))
-    end_wd = _weekday_index(str(job.get("period_end_day") or "sun"))
-    start_date = last_week_start + timedelta(days=start_wd)
-    end_date = last_week_start + timedelta(days=end_wd)
+    end_wd = _weekday_index(str(job.get("period_end_day") or "wed"))
+    start_date = week_start + timedelta(days=start_wd)
+    end_date = week_start + timedelta(days=end_wd)
     sh, sm = _parse_time(job.get("period_start_time") or "00:00")
     eh, em = _parse_time(job.get("period_end_time") or "23:59")
     start_dt = datetime(start_date.year, start_date.month, start_date.day, sh, sm, 0, 0)
