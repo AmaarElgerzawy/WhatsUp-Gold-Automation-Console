@@ -51,6 +51,21 @@ def find_device_id(cursor, display_name, group_name):
     row = cursor.fetchone()
     return row[0] if row else None
 
+
+def find_device_id_by_network_address(cursor, network_address):
+    """Find device by its NetworkInterface.sNetworkAddress."""
+    if not network_address:
+        return None
+
+    cursor.execute("""
+        SELECT nDeviceID
+        FROM NetworkInterface
+        WHERE sNetworkAddress = ?
+    """, (network_address,))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
 def update_device(cursor, device_id, note, device_type):
     """
     Update Device: sNote, nDeviceTypeID.
@@ -152,11 +167,16 @@ def process_row(cursor, row_dict):
         return False, "sDisplayName or sGroupName missing"
 
     device_id = find_device_id(cursor, disp, group_name)
-    if not device_id:
-        return False, "Device not found (name+group)"
 
     ip_addr   = safe_str(row_dict.get("NetworkAddress"))
     net_name  = safe_str(row_dict.get("NetworkName"))
+
+    if not device_id and ip_addr:
+        device_id = find_device_id_by_network_address(cursor, ip_addr)
+
+    if not device_id:
+        return False, "Device not found (name+group or network address)"
+
     note      = safe_str(row_dict.get("Notes"))
     dev_type  = safe_int(row_dict.get("DeviceType"))
     new_group = safe_int(row_dict.get("NewDeviceGroup"))
