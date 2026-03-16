@@ -684,7 +684,6 @@ def write_excel_for_group(device_group_id: int,
     # Columns exactly like the WUG export
     headers = [
         "Device",
-        "Network Address (IP)",
         "Monitor",
         "Up",
         "Up Duration",
@@ -695,6 +694,7 @@ def write_excel_for_group(device_group_id: int,
         "Down",
         "Down Duration",
         "Total Duration",
+        "Network Address (IP)",
         "Note",
     ]
     last_col_letter = get_column_letter(len(headers))
@@ -749,63 +749,63 @@ def write_excel_for_group(device_group_id: int,
         c = ws.cell(row=row_idx, column=1, value=r["Device"])
         c.border = thin_border
         
-        c = ws.cell(row=row_idx, column=2, value=r["IPAddress"])
-        c.border = thin_border
-        
-        c = ws.cell(row=row_idx, column=3, value=r["Note"])
-        c.border = thin_border
-
         # Monitor
-        c = ws.cell(row=row_idx, column=4, value=r["Monitor"])
+        c = ws.cell(row=row_idx, column=2, value=r["Monitor"])
         c.border = thin_border
 
         # Up %
-        up_cell = ws.cell(row=row_idx, column=5, value=up_fraction)
+        up_cell = ws.cell(row=row_idx, column=3, value=up_fraction)
         up_cell.number_format = "0.0000000%"
         up_cell.alignment = right_align
         up_cell.border = thin_border
 
         # Up Duration
-        c = ws.cell(row=row_idx, column=6, value=r["UpDuration"])
+        c = ws.cell(row=row_idx, column=4, value=r["UpDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Maintenance %
-        maint_cell = ws.cell(row=row_idx, column=7, value=maint_fraction)
+        maint_cell = ws.cell(row=row_idx, column=5, value=maint_fraction)
         maint_cell.number_format = "0.0000000%"
         maint_cell.alignment = right_align
         maint_cell.border = thin_border
 
         # Maintenance Duration
-        c = ws.cell(row=row_idx, column=8, value=r["MaintenanceDuration"])
+        c = ws.cell(row=row_idx, column=6, value=r["MaintenanceDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Unknown %
-        unknown_cell = ws.cell(row=row_idx, column=9, value=unknown_fraction)
+        unknown_cell = ws.cell(row=row_idx, column=7, value=unknown_fraction)
         unknown_cell.number_format = "0.0000000%"
         unknown_cell.alignment = right_align
         unknown_cell.border = thin_border
 
         # Unknown Duration
-        c = ws.cell(row=row_idx, column=10, value=r["UnknownDuration"])
+        c = ws.cell(row=row_idx, column=8, value=r["UnknownDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Down %
-        down_cell = ws.cell(row=row_idx, column=11, value=down_fraction)
+        down_cell = ws.cell(row=row_idx, column=9, value=down_fraction)
         down_cell.number_format = "0.0000000%"
         down_cell.alignment = right_align
         down_cell.border = thin_border
 
         # Down Duration
-        c = ws.cell(row=row_idx, column=12, value=r["DownDuration"])
+        c = ws.cell(row=row_idx, column=10, value=r["DownDuration"])
         c.alignment = right_align
         c.border = thin_border
 
         # Total Duration
-        c = ws.cell(row=row_idx, column=13, value=r["TotalDuration"])
+        c = ws.cell(row=row_idx, column=11, value=r["TotalDuration"])
         c.alignment = right_align
+        c.border = thin_border
+        
+        c = ws.cell(row=row_idx, column=12, value=r["IPAddress"])
+        c.border = thin_border
+        
+        c = ws.cell(row=row_idx, column=13, value=r["Note"])
         c.border = thin_border
 
         row_idx += 1

@@ -174,8 +174,8 @@ def write_excel(group_name, rows, start_date, end_date):
         "Maintenance", "Maintenance Duration",
         "Unknown", "Unknown Duration",
         "Down", "Down Duration",
-        "Note",
-        "Total Duration"
+        "Total Duration",
+        "Note"
     ]
 
     bold = Font(bold=True)
