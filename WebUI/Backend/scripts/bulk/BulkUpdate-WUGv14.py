@@ -52,6 +52,27 @@ def find_device_id(cursor, display_name, group_name):
     return row[0] if row else None
 
 
+def find_device_id_by_network_address_and_group(cursor, network_address, group_name):
+    """Find device by NetworkInterface.sNetworkAddress + DeviceGroup.sGroupName."""
+    if not network_address or not group_name:
+        return None
+
+    cursor.execute("""
+        SELECT Device.nDeviceID
+        FROM Device
+        JOIN PivotDeviceToGroup
+            ON Device.nDeviceID = PivotDeviceToGroup.nDeviceID
+        JOIN DeviceGroup
+            ON DeviceGroup.nDeviceGroupID = PivotDeviceToGroup.nDeviceGroupID
+        JOIN NetworkInterface
+            ON Device.nDeviceID = NetworkInterface.nDeviceID
+        WHERE NetworkInterface.sNetworkAddress = ?
+          AND DeviceGroup.sGroupName = ?;
+    """, (network_address, group_name))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
 def find_device_id_by_network_address(cursor, network_address):
     """Find device by its NetworkInterface.sNetworkAddress."""
     if not network_address:
@@ -66,13 +87,20 @@ def find_device_id_by_network_address(cursor, network_address):
     return row[0] if row else None
 
 
-def update_device(cursor, device_id, note, device_type):
+def update_device(cursor, device_id, new_display_name, note, device_type):
     """
-    Update Device: sNote, nDeviceTypeID.
+    Update Device row:
+      - sDisplayName (if new_display_name provided)
+      - sNote
+      - nDeviceTypeID
     Only updates columns that are not None.
     """
     set_parts = []
     params = []
+
+    if new_display_name is not None:
+        set_parts.append("sDisplayName = ?")
+        params.append(new_display_name)
 
     if note is not None:
         set_parts.append("sNote = ?")
@@ -158,31 +186,45 @@ def process_row(cursor, row_dict):
     """
     row_dict keys (normalized):
       sDisplayName, sGroupName,
-      NetworkAddress, NetworkName, Notes, DeviceType, NewDeviceGroup
+      NetworkAddress, NetworkName, Notes, DeviceType, NewDeviceGroup,
+      newDisplayName, NewNetworkAddress
     """
     disp = safe_str(row_dict.get("sDisplayName"))
     group_name = safe_str(row_dict.get("sGroupName"))
+    lookup_ip = safe_str(row_dict.get("NetworkAddress"))
 
-    if not disp or not group_name:
-        return False, "sDisplayName or sGroupName missing"
+    if not group_name:
+        return False, "sGroupName missing"
 
-    device_id = find_device_id(cursor, disp, group_name)
+    device_id = None
 
-    ip_addr   = safe_str(row_dict.get("NetworkAddress"))
-    net_name  = safe_str(row_dict.get("NetworkName"))
+    # 1) Primary lookup: IP + Group
+    if lookup_ip:
+        device_id = find_device_id_by_network_address_and_group(cursor, lookup_ip, group_name)
 
-    if not device_id and ip_addr:
-        device_id = find_device_id_by_network_address(cursor, ip_addr)
+        # 2) If not found by IP+Group, try IP-only
+        if not device_id:
+            device_id = find_device_id_by_network_address(cursor, lookup_ip)
+
+    # 3) If still not found, fallback to DisplayName+Group
+    if not device_id:
+        if not disp:
+            return False, "sDisplayName missing"
+        device_id = find_device_id(cursor, disp, group_name)
 
     if not device_id:
-        return False, "Device not found (name+group or network address)"
+        return False, "Device not found (by IP+group, IP-only, or name+group)"
 
-    note      = safe_str(row_dict.get("Notes"))
-    dev_type  = safe_int(row_dict.get("DeviceType"))
-    new_group = safe_int(row_dict.get("NewDeviceGroup"))
+    # Updates (note that we separate lookup vs update values):
+    new_disp      = safe_str(row_dict.get("newDisplayName") or row_dict.get("NewDisplayName"))
+    new_net_addr  = safe_str(row_dict.get("newNetworkAddress") or row_dict.get("NewNetworkAddress"))
+    net_name      = safe_str(row_dict.get("NetworkName"))
+    note          = safe_str(row_dict.get("Notes"))
+    dev_type      = safe_int(row_dict.get("DeviceType"))
+    new_group     = safe_int(row_dict.get("NewDeviceGroup"))
 
-    dev_count = update_device(cursor, device_id, note, dev_type)
-    ni_count  = upsert_network_interface(cursor, device_id, ip_addr, net_name)
+    dev_count = update_device(cursor, device_id, new_disp, note, dev_type)
+    ni_count  = upsert_network_interface(cursor, device_id, new_net_addr, net_name)
     grp_count = update_device_group(cursor, device_id, new_group)
 
     info = {
@@ -216,9 +258,16 @@ def main():
                     key = "sDisplayName"
                 elif kl in ("groupname", "sgroupname", "devicegroup", "devicegroupname"):
                     key = "sGroupName"
+                elif kl in ("snetworkaddress", "networkaddress"):
+                    # allow either spelling for the lookup network address column
+                    key = "NetworkAddress"
+                elif kl in ("newdisplayname",):
+                    key = "newDisplayName"
+                elif kl in ("newnetworkaddress",):
+                    key = "NewNetworkAddress"
                 else:
                     # keep other headers as-is:
-                    # NetworkAddress, NetworkName, Notes, DeviceType, NewDeviceGroup
+                    # NetworkName, Notes, DeviceType, NewDeviceGroup
                     pass
 
                 normalized[key] = v
