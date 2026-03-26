@@ -89,7 +89,8 @@ from constants import (
     get_connection_string,
 )
 
-from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group, run_scheduled_reports
+from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group
+from scripts.reporting.ReportScheduler import run_scheduled_reports
 from scripts.reporting.DeviceUpTimeReport import run_sp_group_device_uptime, write_excel
 
 # ================= INITIALIZATION =================
