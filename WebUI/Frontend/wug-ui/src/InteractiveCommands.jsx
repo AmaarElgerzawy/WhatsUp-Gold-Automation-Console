@@ -5,6 +5,7 @@ import { apiCall } from "./utils/api";
 
 export default function InteractiveCommands() {
   const [routers, setRouters] = useState("");
+  const [deviceTypeDefault, setDeviceTypeDefault] = useState("cisco_ios");
   const [tasks, setTasks] = useState([]);
   const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -90,6 +91,7 @@ export default function InteractiveCommands() {
 
     const formData = new FormData();
     formData.append("routers", routers.trim());
+    formData.append("device_type_default", (deviceTypeDefault || "cisco_ios").trim());
     formData.append("tasks_json", JSON.stringify(tasks, null, 2));
     formData.append("username", username.trim());
     formData.append("password", password.trim());
@@ -136,10 +138,33 @@ export default function InteractiveCommands() {
       <div className="two-column-layout">
         <div className="form-group">
           <label className="form-label">Routers</label>
+          <div className="form-grid" style={{ marginBottom: 10 }}>
+            <div className="form-group">
+              <label className="form-label">Default router type</label>
+              <select
+                className="input"
+                value={deviceTypeDefault}
+                onChange={(e) => setDeviceTypeDefault(e.target.value)}
+              >
+                <option value="cisco_ios">Cisco IOS</option>
+                <option value="cisco_xe">Cisco IOS-XE</option>
+                <option value="cisco_nxos">Cisco NX-OS</option>
+                <option value="juniper">Juniper JunOS</option>
+                <option value="arista_eos">Arista EOS</option>
+                <option value="huawei">Huawei</option>
+                <option value="hp_procurve">HP ProCurve</option>
+                <option value="mikrotik_routeros">MikroTik RouterOS</option>
+                <option value="fortinet">Fortinet FortiOS</option>
+              </select>
+              <span className="helper-text">
+                You can override per line: <code>10.0.0.1, juniper</code>
+              </span>
+            </div>
+          </div>
           <textarea
             className="textarea"
             rows={4}
-            placeholder="One router per line"
+            placeholder={`One router per line\nExamples:\n10.0.0.1\n10.0.0.2, juniper\n10.0.0.3 | arista_eos`}
             value={routers}
             onChange={(e) => setRouters(e.target.value)}
           />

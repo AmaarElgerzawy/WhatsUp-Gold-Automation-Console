@@ -40,6 +40,7 @@ yarn-error.log*
 WebUI/Frontend/wug-ui/build/
 WebUI/Frontend/wug-ui/.pnp
 WebUI/Frontend/wug-ui/.pnp.js
+WebUI/Backend/scripts/reporting/state.json
 
 # Testing
 .coverage

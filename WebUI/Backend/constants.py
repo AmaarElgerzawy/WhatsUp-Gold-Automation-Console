@@ -73,22 +73,22 @@ ROUTER_SCRIPTS_DIR = SCRIPTS_DIR / "routers"
 BACKUP_SCRIPTS_DIR = SCRIPTS_DIR / "backup"
 REPORTING_SCRIPTS_DIR = SCRIPTS_DIR / "reporting"
 
-# SSH CREDIT
-SSH_USERNAME = 'admin'
-SSH_PASSWORD = 'maxor'
-SSH_ENABLE_PASSWORD = 'MAXOR321'
+# SSH CREDENTIALS
+SSH_USERNAME = os.environ.get("WUG_SSH_USER", "admin")
+SSH_PASSWORD = os.environ.get("WUG_SSH_PASS", "maxor")
+SSH_ENABLE_PASSWORD = os.environ.get("WUG_SSH_ENABLE", os.environ.get("WUG_SSH_PASS", "MAXOR321"))
 if not SSH_ENABLE_PASSWORD:
     SSH_ENABLE_PASSWORD = SSH_PASSWORD
 
 # ===== EMAIL CONFIG (Brevo) =====
-SMTP_SERVER = "smtp-relay.brevo.com"
-SMTP_PORT = 587
+SMTP_SERVER = os.environ.get("WUG_SMTP_SERVER", "smtp-relay.brevo.com")
+SMTP_PORT = int(os.environ.get("WUG_SMTP_PORT", "587"))
 
-BREVO_USERNAME = "9c44f9001@smtp-brevo.com"          # your Brevo SMTP login (e.g. 9c44f9...@smtp-brevo.com)
-BREVO_SMTP_KEY = "q3bw9TXCtpLU4Qhj"             # your Brevo SMTP key / password
+BREVO_USERNAME = os.environ.get("WUG_BREVO_USERNAME", "9c44f9001@smtp-brevo.com")
+BREVO_SMTP_KEY = os.environ.get("WUG_BREVO_SMTP_KEY", "q3bw9TXCtpLU4Qhj")
 
-SENDER = "snipergolden1234@gmail.com"
-RECEIVER = "snipergolden1234@gmail.com"  # can be your Gmail or a list later
+SENDER = os.environ.get("WUG_EMAIL_SENDER", "snipergolden1234@gmail.com")
+RECEIVER = os.environ.get("WUG_EMAIL_RECEIVER", "snipergolden1234@gmail.com")
 
 # Data directories
 DATA_DIR = BASEDIR / "data"

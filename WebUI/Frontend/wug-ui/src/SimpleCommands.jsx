@@ -5,6 +5,7 @@ import { apiCall } from "./utils/api";
 
 export default function SimpleCommands() {
   const [routers, setRouters] = useState("");
+  const [deviceTypeDefault, setDeviceTypeDefault] = useState("cisco_ios");
   const [commands, setCommands] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedCredId, setSelectedCredId] = useState(null);
@@ -66,6 +67,7 @@ export default function SimpleCommands() {
     const fd = new FormData();
     fd.append("routers", routers.trim());
     fd.append("config", commands.trim());
+    fd.append("device_type_default", (deviceTypeDefault || "cisco_ios").trim());
     fd.append("username", username.trim());
     fd.append("password", password.trim());
     fd.append("enable_password", enablePassword.trim() || "");
@@ -113,15 +115,38 @@ export default function SimpleCommands() {
       <div className="two-column-layout">
         <div className="form-group">
           <label className="form-label">Routers</label>
+          <div className="form-grid" style={{ marginBottom: 10 }}>
+            <div className="form-group">
+              <label className="form-label">Default router type</label>
+              <select
+                className="input"
+                value={deviceTypeDefault}
+                onChange={(e) => setDeviceTypeDefault(e.target.value)}
+              >
+                <option value="cisco_ios">Cisco IOS</option>
+                <option value="cisco_xe">Cisco IOS-XE</option>
+                <option value="cisco_nxos">Cisco NX-OS</option>
+                <option value="juniper">Juniper JunOS</option>
+                <option value="arista_eos">Arista EOS</option>
+                <option value="huawei">Huawei</option>
+                <option value="hp_procurve">HP ProCurve</option>
+                <option value="mikrotik_routeros">MikroTik RouterOS</option>
+                <option value="fortinet">Fortinet FortiOS</option>
+              </select>
+              <span className="helper-text">
+                You can override per line: <code>10.0.0.1, juniper</code>
+              </span>
+            </div>
+          </div>
           <textarea
             className="textarea"
-            placeholder="One router per line (hostname or IP)"
+            placeholder={`One router per line (hostname or IP)\nExamples:\n10.0.0.1\n10.0.0.2, juniper\n10.0.0.3 | arista_eos`}
             rows={4}
             value={routers}
             onChange={(e) => setRouters(e.target.value)}
           />
           <span className="helper-text">
-            Examples: 10.0.0.1, core-rtr-01, edge-rtr-02
+            Examples: 10.0.0.1, core-rtr-01, edge-rtr-02, 10.0.0.2, juniper
           </span>
         </div>
 

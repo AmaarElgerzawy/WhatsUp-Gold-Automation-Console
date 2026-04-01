@@ -12,8 +12,44 @@ from constants import SSH_USERNAME, SSH_PASSWORD, SSH_ENABLE_PASSWORD
 base_dir = os.path.dirname(os.path.abspath(__file__))
 ROUTER_LIST_FILE = os.environ.get("WUG_ROUTERS")
 TASKS_FILE = os.environ.get("WUG_TASKS")
+DEVICE_TYPE_DEFAULT = (os.environ.get("WUG_DEVICE_TYPE_DEFAULT") or "cisco_ios").strip() or "cisco_ios"
 LOG_DIR = Path(os.path.join(base_dir, "bulk_sequence_logs"))
 LOG_DIR.mkdir(exist_ok=True)
+
+# ---------- ROUTER LIST PARSER ----------
+def parse_router_line(line: str, default_device_type: str):
+    """
+    Accepts:
+      - "1.2.3.4"
+      - "1.2.3.4, juniper"
+      - "1.2.3.4 | arista_eos"
+      - "1.2.3.4 juniper"   (space separated)
+
+    Returns: {"ip": "...", "device_type": "..."} or None (skip line)
+    """
+    if not line:
+        return None
+
+    raw = line.strip()
+    if not raw or raw.startswith("#"):
+        return None
+
+    # Normalize separators: comma, pipe, tab => comma
+    normalized = raw.replace("|", ",").replace("\t", ",")
+    parts = [p.strip() for p in normalized.split(",") if p.strip()]
+
+    if len(parts) == 1:
+        # try space-separated "ip vendor"
+        space_parts = [p for p in parts[0].split(" ") if p.strip()]
+        if len(space_parts) >= 2:
+            ip = space_parts[0].strip()
+            dev = space_parts[1].strip()
+            return {"ip": ip, "device_type": dev}
+        return {"ip": parts[0], "device_type": default_device_type}
+
+    ip = parts[0]
+    dev = parts[1] if len(parts) >= 2 else default_device_type
+    return {"ip": ip, "device_type": dev or default_device_type}
 
 # ---------- GENERIC INTERACTIVE HELPER ----------
 def run_interactive_command(conn, command, steps, context=None, max_rounds=10):
@@ -60,22 +96,22 @@ def run_interactive_command(conn, command, steps, context=None, max_rounds=10):
 
     return full_output
 # ---------- LOAD ROUTER IPs ----------
-ips = []
+routers = []
 
 if not ROUTER_LIST_FILE:
     print("ERROR: No routers data provided", file=sys.stderr)
     sys.exit(1)
 
 for line in ROUTER_LIST_FILE.splitlines():
-    line = line.strip()
-    if line and not line.startswith("#"):
-        ips.append(line)
+    parsed = parse_router_line(line, DEVICE_TYPE_DEFAULT)
+    if parsed:
+        routers.append(parsed)
 
-if not ips:
+if not routers:
     print(f"ERROR: No router IPs found", file=sys.stderr)
     sys.exit(1)
 
-print(f"Found {len(ips)} router(s)")
+print(f"Found {len(routers)} router(s)")
 # ---------- LOAD TASKS (ORDERED SEQUENCE) ----------
 
 if not TASKS_FILE:
@@ -97,11 +133,13 @@ print(f"Loaded {len(tasks)} task(s)")
 timestamp_global = datetime.now().strftime("%Y%m%d-%H%M%S")
 # ---------- MAIN LOOP PER ROUTER ----------
 
-for ip in ips:
-    print(f"\n=== Connecting to {ip} ===")
+for r in routers:
+    ip = r["ip"]
+    device_type = (r.get("device_type") or DEVICE_TYPE_DEFAULT).strip() or DEVICE_TYPE_DEFAULT
+    print(f"\n=== Connecting to {ip} ({device_type}) ===")
 
     device = {
-        "device_type": "cisco_ios",   # change if needed
+        "device_type": device_type,
         "ip": ip,
         "username": SSH_USERNAME,
         "password": SSH_PASSWORD,

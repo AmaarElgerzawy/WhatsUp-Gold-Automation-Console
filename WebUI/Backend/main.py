@@ -10,6 +10,13 @@ import pyodbc
 import os
 import asyncio
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env: repo root first, then WebUI/Backend (overrides) so WUG_* is found reliably
+_backend_dir = Path(__file__).resolve().parent
+_repo_root = _backend_dir.parent.parent
+load_dotenv(_repo_root / ".env")
+load_dotenv(_backend_dir / ".env", override=True)
 from datetime import datetime, timedelta
 import shutil
 import json
@@ -32,6 +39,9 @@ from auth import (
     ROLE_PRIVILEGES,
     AVAILABLE_PRIVILEGES,
 )
+
+# Active Directory login + auto-provision
+from ad_auth import ad_login_and_get_user
 
 # Import constants
 from constants import (
@@ -89,7 +99,11 @@ from constants import (
     get_connection_string,
 )
 
-from scripts.reporting.ReportExcel import get_device_groups, write_excel_for_group
+from scripts.reporting.ReportExcel import (
+    get_device_groups,
+    write_excel_for_group,
+    OUTPUT_FOLDER,
+)
 from scripts.reporting.ReportScheduler import run_scheduled_reports
 from scripts.reporting.DeviceUpTimeReport import run_sp_group_device_uptime, write_excel
 
@@ -216,7 +230,7 @@ def run_bulk(
     file: UploadFile = File(...),
     config_name: str = Form(""),
     log_name: str = Form(""),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_privilege("bulk_operations")),
 ):
     if operation not in SCRIPTS:
         raise HTTPException(400, ERROR_INVALID_OPERATION)
@@ -277,7 +291,10 @@ def run_bulk(
         }
 
 @app.get("/bulk/template/{operation}")
-def download_bulk_template(operation: str):
+def download_bulk_template(
+    operation: str,
+    current_user: dict = Depends(require_privilege("bulk_operations")),
+):
     templates = load_templates()
 
     if operation not in templates:
@@ -302,13 +319,14 @@ def download_bulk_template(operation: str):
 @app.post("/routers/run-interactive")
 def run_interactive(
     routers: str = Form(...),
+    device_type_default: str = Form("cisco_ios"),
     tasks_json: str = Form(...),
     username: str = Form(...),
     password: str = Form(...),
     enable_password: str = Form(""),
     config_name: str = Form(""),
     log_name: str = Form(""),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_privilege("router_commands")),
 ):
     script_path = str(ROUTER_SCRIPTS_DIR / "Interactive_Commands.py")
 
@@ -319,6 +337,7 @@ def run_interactive(
     env[ENV_WUG_SSH_USER] = username
     env[ENV_WUG_SSH_PASS] = password
     env[ENV_WUG_SSH_ENABLE] = enable_password or password
+    env["WUG_DEVICE_TYPE_DEFAULT"] = (device_type_default or "").strip() or "cisco_ios"
 
     try:
         proc = subprocess.run(
@@ -373,12 +392,13 @@ def run_interactive(
 def run_simple(
     routers: str = Form(...),
     config: str = Form(...),
+    device_type_default: str = Form("cisco_ios"),
     username: str = Form(...),
     password: str = Form(...),
     enable_password: str = Form(""),
     config_name: str = Form(""),
     log_name: str = Form(""),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_privilege("router_commands")),
 ):
     script_path = str(ROUTER_SCRIPTS_DIR / "Simple_Config.py")
 
@@ -398,6 +418,7 @@ def run_simple(
         env["WUG_SSH_USER"] = username
         env["WUG_SSH_PASS"] = password
         env["WUG_SSH_ENABLE"] = enable_password or password
+        env["WUG_DEVICE_TYPE_DEFAULT"] = (device_type_default or "").strip() or "cisco_ios"
 
         proc = subprocess.run(
             ["python", script_path],
@@ -437,12 +458,26 @@ def run_simple(
 @app.post("/auth/login")
 def login(username: str = Form(...), password: str = Form(...)):
     """Login endpoint."""
-    user = get_user_by_username(username)
-    if not user or not verify_password(password, user["password_hash"]):
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password"
-        )
+    username = (username or "").strip()
+    # 1) Local login path (keeps current admin working)
+    local_user = get_user_by_username(username)
+    if local_user and local_user.get("password_hash") and verify_password(
+        password, local_user["password_hash"]
+    ):
+        user = local_user
+        print(f"[LOGIN] local auth success for {username}")
+    else:
+        print(f"[LOGIN] local auth failed for {username}, trying AD")
+        # 2) AD login path (auto-provision user with no privileges, then admin grants privileges)
+        try:
+            user = ad_login_and_get_user(username=username, password=password)
+        except Exception as e:
+            print(f"[LOGIN] AD login exception for {username}: {e}")
+            user = None
+
+        if not user:
+            print(f"[LOGIN] authentication failed for {username}")
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
     
     access_token_expires = timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -837,14 +872,14 @@ def update_bulk_templates(
 
 # ================= VIEW / DELETE =================
 @app.get("/configs/{section}")
-def list_configs(section: str, current_user: dict = Depends(get_current_user)):
+def list_configs(section: str, current_user: dict = Depends(require_privilege("view_history"))):
     log_activity(current_user["id"], "list_configs", f"Listed configs in {section}", "history")
     return os.listdir(CONFIG_DIR / section)
 
 @app.get("/configs/{section}/{name}")
 def get_config(
     section: str, name: str, download: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_privilege("view_history"))
 ):
     file_path = CONFIG_DIR / section / name
     if not file_path.exists():
@@ -862,7 +897,7 @@ def get_config(
     return file_path.read_text()
 
 @app.delete("/configs/{section}/{name}")
-def delete_config(section: str, name: str, current_user: dict = Depends(get_current_user)):
+def delete_config(section: str, name: str, current_user: dict = Depends(require_privilege("view_history"))):
     os.remove(CONFIG_DIR / section / name)
     log_activity(current_user["id"], "delete_config", f"Deleted {section}/{name}", "history")
     return {"status": "deleted"}
@@ -870,7 +905,7 @@ def delete_config(section: str, name: str, current_user: dict = Depends(get_curr
 @app.put("/configs/{section}/{name}")
 def rename_config(
     section: str, name: str, payload: dict = Body(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_privilege("view_history"))
 ):
     old_path = CONFIG_DIR / section / name
     new_name = payload.get("new_name", "").strip()
@@ -903,14 +938,14 @@ def rename_config(
     return {"status": "renamed", "new_name": f"{sanitized}{old_ext}"}
 
 @app.get("/logs")
-def list_logs(current_user: dict = Depends(get_current_user)):
+def list_logs(current_user: dict = Depends(require_privilege("view_history"))):
     log_activity(current_user["id"], "list_logs", "Listed log files", "history")
     return os.listdir(LOG_DIR)
 
 @app.get("/logs/{name}")
 def get_log(
     name: str, download: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_privilege("view_history"))
 ):
     file_path = LOG_DIR / name
     if not file_path.exists():
@@ -928,7 +963,7 @@ def get_log(
     return file_path.read_text()
 
 @app.delete("/logs/{name}")
-def delete_log(name: str, current_user: dict = Depends(get_current_user)):
+def delete_log(name: str, current_user: dict = Depends(require_privilege("view_history"))):
     os.remove(LOG_DIR / name)
     log_activity(current_user["id"], "delete_log", f"Deleted log: {name}", "history")
     return {"status": "deleted"}
@@ -936,7 +971,7 @@ def delete_log(name: str, current_user: dict = Depends(get_current_user)):
 @app.put("/logs/{name}")
 def rename_log(
     name: str, payload: dict = Body(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_privilege("view_history"))
 ):
     old_path = LOG_DIR / name
     new_name = payload.get("new_name", "").strip()
@@ -970,7 +1005,7 @@ def rename_log(
 
 # ================= Backup =================
 @app.get("/backups/devices")
-def list_backup_devices(current_user: dict = Depends(get_current_user)):
+def list_backup_devices(current_user: dict = Depends(require_privilege("view_backups"))):
     if not BACKUP_BASE_DIR.exists():
         return []
 
@@ -981,7 +1016,7 @@ def list_backup_devices(current_user: dict = Depends(get_current_user)):
     ]
 
 @app.get("/backups/{device}")
-def list_device_configs(device: str, current_user: dict = Depends(get_current_user)):
+def list_device_configs(device: str, current_user: dict = Depends(require_privilege("view_backups"))):
     device_dir = BACKUP_BASE_DIR / device
     if not device_dir.exists():
         raise HTTPException(404, "Device not found")
@@ -995,7 +1030,7 @@ def list_device_configs(device: str, current_user: dict = Depends(get_current_us
 @app.get("/backups/{device}/{filename}")
 def view_backup_file(
     device: str, filename: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_privilege("view_backups"))
 ):
     file_path = BACKUP_BASE_DIR / device / filename
 
@@ -1006,7 +1041,7 @@ def view_backup_file(
     return file_path.read_text(encoding="utf-8", errors="ignore")
 
 @app.get("/backup/routers")
-def get_backup_routers(current_user: dict = Depends(get_current_user)):
+def get_backup_routers(current_user: dict = Depends(require_privilege("view_backups"))):
     if not ROUTERS_FILE.exists():
         return {"content": ""}
 
@@ -1018,7 +1053,7 @@ def get_backup_routers(current_user: dict = Depends(get_current_user)):
 @app.post("/backup/routers")
 def save_backup_routers(
     payload: dict = Body(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_privilege("view_backups"))
 ):
     content = payload.get("content", "")
 
@@ -1092,7 +1127,7 @@ async def _stop_report_scheduler():
     print("[REPORT SCHEDULER] Stopped")
 # ================= Reporting =================
 @app.get("/reports/schedule")
-def get_report_schedule(current_user: dict = Depends(get_current_user)):
+def get_report_schedule(current_user: dict = Depends(require_privilege("manage_reports"))):
     """
     Return the current report schedule in a JSON-friendly format.
 
@@ -1219,9 +1254,23 @@ def generate_manual_report(
 @app.get("/reports/download")
 def download_report(
     path: str,
+    current_user: dict = Depends(require_privilege("manage_reports")),
 ):
+    # Prevent reading arbitrary server files by restricting downloads to the exports folder.
+    real_path = os.path.realpath(path)
+    base_dir = os.path.realpath(str(OUTPUT_FOLDER))
+    if not real_path.startswith(base_dir + os.sep):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     if not os.path.exists(path):
         raise HTTPException(404, "File not found")
+
+    log_activity(
+        current_user["id"],
+        "download_report",
+        f"Downloaded report: {os.path.basename(path)}",
+        "reports",
+    )
 
     return FileResponse(path, filename=os.path.basename(path))
 

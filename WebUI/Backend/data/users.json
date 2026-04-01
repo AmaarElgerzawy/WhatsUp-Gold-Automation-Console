@@ -31,5 +31,27 @@
     ],
     "active": true,
     "created_at": "2025-12-21T08:30:14.109177"
+  },
+  {
+    "id": "ammar_elgerzawy_maxor_com",
+    "username": "ammar.elgerzawy@maxor.com",
+    "email": "ammar.elgerzawy@maxor.com",
+    "password_hash": "",
+    "role": "custom",
+    "privileges": [
+      "manage_reports"
+    ],
+    "active": true,
+    "created_at": "2026-03-28T15:33:26.379646"
+  },
+  {
+    "id": "m_ezzat_maxor_com",
+    "username": "m.ezzat@maxor.com",
+    "email": "m.ezzat@maxor.com",
+    "password_hash": "",
+    "role": "custom",
+    "privileges": [],
+    "active": true,
+    "created_at": "2026-03-28T15:34:49.787701"
   }
 ]

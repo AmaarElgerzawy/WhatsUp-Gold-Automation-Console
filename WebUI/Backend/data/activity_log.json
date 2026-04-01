@@ -1,170 +1,58 @@
 [
   {
-    "timestamp": "2026-03-02T00:38:00.897998",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed report schedule",
+    "timestamp": "2026-03-28T15:34:06.028806",
+    "user_id": "ammar_elgerzawy_maxor_com",
+    "action": "list_report_groups",
+    "details": "Viewed device groups for reports",
     "page": "reports"
   },
   {
-    "timestamp": "2026-03-02T00:38:00.927026",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed report schedule",
+    "timestamp": "2026-03-28T15:34:06.040781",
+    "user_id": "ammar_elgerzawy_maxor_com",
+    "action": "list_report_groups",
+    "details": "Viewed device groups for reports",
     "page": "reports"
   },
   {
-    "timestamp": "2026-03-02T00:38:00.971928",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed report schedule",
+    "timestamp": "2026-03-28T15:34:06.055737",
+    "user_id": "ammar_elgerzawy_maxor_com",
+    "action": "list_report_groups",
+    "details": "Viewed device groups for reports",
     "page": "reports"
   },
   {
-    "timestamp": "2026-03-14T04:09:01.590601",
+    "timestamp": "2026-03-28T15:34:06.094226",
+    "user_id": "ammar_elgerzawy_maxor_com",
+    "action": "view_report_schedule",
+    "details": "Viewed empty report schedule",
+    "page": "reports"
+  },
+  {
+    "timestamp": "2026-03-28T15:34:49.788560",
+    "user_id": "m_ezzat_maxor_com",
+    "action": "login",
+    "details": "User m.ezzat@maxor.com logged in",
+    "page": "login"
+  },
+  {
+    "timestamp": "2026-03-30T20:56:50.710919",
     "user_id": "admin",
     "action": "login",
     "details": "User admin logged in",
     "page": "login"
   },
   {
-    "timestamp": "2026-03-14T04:09:04.450769",
+    "timestamp": "2026-03-30T20:56:53.367191",
     "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
+    "action": "list_configs",
+    "details": "Listed configs in bulk_add",
+    "page": "history"
   },
   {
-    "timestamp": "2026-03-14T04:09:04.461415",
+    "timestamp": "2026-03-30T20:56:53.382065",
     "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:09:04.683671",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:12:24.842509",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:12:24.902675",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:14:24.591068",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:14:24.611450",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:14:24.660349",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:14:25.114134",
-    "user_id": "admin",
-    "action": "list_users",
-    "details": "Viewed user list",
-    "page": "admin"
-  },
-  {
-    "timestamp": "2026-03-14T04:14:25.131465",
-    "user_id": "admin",
-    "action": "list_users",
-    "details": "Viewed user list",
-    "page": "admin"
-  },
-  {
-    "timestamp": "2026-03-14T04:15:06.296833",
-    "user_id": "admin",
-    "action": "update_db_connection",
-    "details": "Updated database connection string",
-    "page": "admin"
-  },
-  {
-    "timestamp": "2026-03-14T04:15:10.115630",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:15:10.130411",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:15:10.175339",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:15:23.166458",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:15:23.185724",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:15:23.239376",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:18:20.064009",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:18:20.081560",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-03-14T04:18:20.158551",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
+    "action": "list_configs",
+    "details": "Listed configs in bulk_add",
+    "page": "history"
   }
 ]
