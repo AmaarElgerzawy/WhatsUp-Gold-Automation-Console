@@ -91,7 +91,10 @@ export default function InteractiveCommands() {
 
     const formData = new FormData();
     formData.append("routers", routers.trim());
-    formData.append("device_type_default", (deviceTypeDefault || "cisco_ios").trim());
+    formData.append(
+      "device_type_default",
+      (deviceTypeDefault || "cisco_ios").trim(),
+    );
     formData.append("tasks_json", JSON.stringify(tasks, null, 2));
     formData.append("username", username.trim());
     formData.append("password", password.trim());
@@ -115,7 +118,7 @@ export default function InteractiveCommands() {
       setOutput(
         `EXIT CODE: ${data.returncode}\n\n` +
           `STDOUT:\n${data.stdout}\n\n` +
-          `STDERR:\n${data.stderr}`
+          `STDERR:\n${data.stderr}`,
       );
     } catch (e) {
       setError(e.toString());
@@ -138,6 +141,16 @@ export default function InteractiveCommands() {
       <div className="two-column-layout">
         <div className="form-group">
           <label className="form-label">Routers</label>
+          <textarea
+            className="textarea"
+            rows={4}
+            placeholder={`One router per line\nExamples:\n10.0.0.1\n10.0.0.2, juniper\n10.0.0.3 | arista_eos`}
+            value={routers}
+            onChange={(e) => setRouters(e.target.value)}
+          />
+          <span className="helper-text">
+            You can override per line: <code>10.0.0.1, juniper</code>
+          </span>
           <div className="form-grid" style={{ marginBottom: 10 }}>
             <div className="form-group">
               <label className="form-label">Default router type</label>
@@ -156,18 +169,8 @@ export default function InteractiveCommands() {
                 <option value="mikrotik_routeros">MikroTik RouterOS</option>
                 <option value="fortinet">Fortinet FortiOS</option>
               </select>
-              <span className="helper-text">
-                You can override per line: <code>10.0.0.1, juniper</code>
-              </span>
             </div>
           </div>
-          <textarea
-            className="textarea"
-            rows={4}
-            placeholder={`One router per line\nExamples:\n10.0.0.1\n10.0.0.2, juniper\n10.0.0.3 | arista_eos`}
-            value={routers}
-            onChange={(e) => setRouters(e.target.value)}
-          />
         </div>
 
         <div>

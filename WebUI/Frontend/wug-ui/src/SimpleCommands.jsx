@@ -86,8 +86,8 @@ export default function SimpleCommands() {
           `Error: ${res.status} ${res.statusText}\n${JSON.stringify(
             errorData,
             null,
-            2
-          )}`
+            2,
+          )}`,
         );
         return;
       }
@@ -115,6 +115,16 @@ export default function SimpleCommands() {
       <div className="two-column-layout">
         <div className="form-group">
           <label className="form-label">Routers</label>
+          <textarea
+            className="textarea"
+            placeholder={`One router per line (hostname or IP)\nExamples:\n10.0.0.1\n10.0.0.2, juniper\n10.0.0.3 | arista_eos`}
+            rows={4}
+            value={routers}
+            onChange={(e) => setRouters(e.target.value)}
+          />
+          <span className="helper-text">
+            Examples: 10.0.0.1, core-rtr-01, edge-rtr-02, 10.0.0.2, juniper
+          </span>
           <div className="form-grid" style={{ marginBottom: 10 }}>
             <div className="form-group">
               <label className="form-label">Default router type</label>
@@ -133,21 +143,8 @@ export default function SimpleCommands() {
                 <option value="mikrotik_routeros">MikroTik RouterOS</option>
                 <option value="fortinet">Fortinet FortiOS</option>
               </select>
-              <span className="helper-text">
-                You can override per line: <code>10.0.0.1, juniper</code>
-              </span>
             </div>
           </div>
-          <textarea
-            className="textarea"
-            placeholder={`One router per line (hostname or IP)\nExamples:\n10.0.0.1\n10.0.0.2, juniper\n10.0.0.3 | arista_eos`}
-            rows={4}
-            value={routers}
-            onChange={(e) => setRouters(e.target.value)}
-          />
-          <span className="helper-text">
-            Examples: 10.0.0.1, core-rtr-01, edge-rtr-02, 10.0.0.2, juniper
-          </span>
         </div>
 
         <div className="form-group">
