@@ -47,14 +47,14 @@ class RouterListParser:
 class SimpleConfigPusher:
     def push_from_file(self, router: RouterTarget, config_file: str, device_type_default: str) -> None:
         device_type = (router.device_type or device_type_default).strip() or device_type_default
-        print(f\"\\n=== Connecting to {router.ip} ({device_type}) ===\")
+        print("\\n=== Connecting to {router.ip} ({device_type}) ===")
 
         device = {
-            \"device_type\": device_type,
-            \"ip\": router.ip,
-            \"username\": SSH_USERNAME,
-            \"password\": SSH_PASSWORD,
-            \"secret\": SSH_ENABLE_PASSWORD,
+            "device_type": device_type,
+            "ip": router.ip,
+            "username": SSH_USERNAME,
+            "password": SSH_PASSWORD,
+            "secret": SSH_ENABLE_PASSWORD,
         }
 
         conn = ConnectHandler(**device)
