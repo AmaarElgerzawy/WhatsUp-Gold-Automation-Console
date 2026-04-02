@@ -6,12 +6,31 @@ export default function ConfigBackups() {
   const [selectedDevice, setSelectedDevice] = useState("");
   const [files, setFiles] = useState([]);
   const [content, setContent] = useState("");
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
     apiCall("backups/devices")
       .then((res) => res.json())
       .then(setDevices);
   }, []);
+
+  const refreshDevices = async () => {
+    const res = await apiCall("backups/devices");
+    setDevices(await res.json());
+  };
+
+  const runBackups = async () => {
+    setRunning(true);
+    try {
+      await apiCall("backups/run", { method: "POST" });
+      setSelectedDevice("");
+      setFiles([]);
+      setContent("");
+      await refreshDevices();
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const loadFiles = async (device) => {
     setSelectedDevice(device);
@@ -40,6 +59,18 @@ export default function ConfigBackups() {
 
       <section className="card">
         <div className="two-column-layout" style={{ alignItems: "flex-start" }}>
+          <div style={{ gridColumn: "1 / -1", marginBottom: 8 }}>
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={runBackups}
+              disabled={running}
+              style={{ width: "100%" }}
+            >
+              {running ? "Taking backups..." : "Take backups now"}
+            </button>
+          </div>
+
           {/* Devices */}
           <div>
             <h4 className="card-title" style={{ marginBottom: 8 }}>

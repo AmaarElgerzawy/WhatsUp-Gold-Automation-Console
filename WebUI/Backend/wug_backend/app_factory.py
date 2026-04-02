@@ -77,6 +77,8 @@ from wug_backend.repos.device_repo import DeviceLookupRepository
 from wug_backend.repos.template_repo import BulkTemplateRepository
 from wug_backend.services.bulk_service import BulkOperationService
 from wug_backend.services.router_service import RouterCommandService
+from wug_backend.services.backup_service import BackupService
+from wug_backend.services.backup_scheduler import BackupScheduler
 from wug_backend.utils.file_utils import FileNameService
 from wug_backend.utils.log_utils import LogCollector, OutputSanitizer, LogWriter
 
@@ -159,6 +161,8 @@ def create_app() -> FastAPI:
         activity_interactive_commands_error=ACTIVITY_INTERACTIVE_COMMANDS_ERROR,
         activity_simple_commands=ACTIVITY_SIMPLE_COMMANDS,
     )
+    backup_service = BackupService()
+    BackupScheduler.from_env(backup_service).install(app)
     template_repo = BulkTemplateRepository(template_file=TEMPLATE_FILE, default_encoding=DEFAULT_ENCODING)
     availability_service = AvailabilityReportService()
     uptime_service = DeviceUpTimeReportService()
@@ -716,6 +720,13 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "File not found")
         log_activity(current_user["id"], "view_backup", f"Viewed {device}/{filename}", "backups")
         return file_path.read_text(encoding="utf-8", errors="ignore")
+
+    @app.post("/backups/run")
+    def run_backups_now(current_user: dict = Depends(require_privilege("view_backups"))):
+        # Synchronous run: captures stdout/stderr from the runner and returns it.
+        log_activity(current_user["id"], "run_backups", "Triggered backup capture", "backups")
+        result = backup_service.run_all_backups()
+        return result
 
     @app.get("/backup/routers")
     def get_backup_routers(current_user: dict = Depends(require_privilege("view_backups"))):
