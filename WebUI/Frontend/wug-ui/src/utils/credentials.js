@@ -1,43 +1,62 @@
-const STORAGE_KEY = "wug_credentials";
+import { apiCall } from "./api";
 
-export function getAllCredentials() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (e) {
-    return [];
+/**
+ * Saved credential metadata the current user may use (no passwords).
+ * @returns {Promise<Array<{id, name, username, description}>>}
+ */
+export async function fetchEligibleCredentials() {
+  const res = await apiCall("credentials/eligible");
+  if (!res.ok) return [];
+  return res.json();
+}
+
+/**
+ * Full vault (secrets included) — admin only.
+ */
+export async function fetchAdminCredentials() {
+  const res = await apiCall("admin/credentials");
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createAdminCredential({
+  name,
+  username,
+  password,
+  enablePassword = "",
+  description = "",
+}) {
+  const fd = new FormData();
+  fd.append("name", name.trim());
+  fd.append("username", username.trim());
+  fd.append("password", password);
+  fd.append("enable_password", enablePassword || "");
+  fd.append("description", description.trim());
+  return apiCall("admin/credentials", { method: "POST", body: fd });
+}
+
+export async function updateAdminCredential(
+  id,
+  { name, username, password, enablePassword, description },
+) {
+  const fd = new FormData();
+  fd.append("name", name.trim());
+  fd.append("username", username.trim());
+  if (password !== undefined && password !== null && String(password).trim()) {
+    fd.append("password", password);
   }
-}
-
-export function saveCredential(cred) {
-  const all = getAllCredentials();
-  const existingIndex = all.findIndex((c) => c.id === cred.id);
-
-  if (existingIndex >= 0) {
-    all[existingIndex] = cred;
-  } else {
-    all.push(cred);
+  if (enablePassword !== undefined && enablePassword !== null && String(enablePassword).trim()) {
+    fd.append("enable_password", enablePassword);
   }
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  // Dispatch custom event for same-window updates
-  window.dispatchEvent(new Event("credentialsUpdated"));
-  return cred;
+  fd.append("description", (description || "").trim());
+  return apiCall(`admin/credentials/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: fd,
+  });
 }
 
-export function deleteCredential(id) {
-  const all = getAllCredentials();
-  const filtered = all.filter((c) => c.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  // Dispatch custom event for same-window updates
-  window.dispatchEvent(new Event("credentialsUpdated"));
-}
-
-export function getCredential(id) {
-  const all = getAllCredentials();
-  return all.find((c) => c.id === id);
-}
-
-export function createCredentialId() {
-  return `cred_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+export async function deleteAdminCredential(id) {
+  return apiCall(`admin/credentials/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }

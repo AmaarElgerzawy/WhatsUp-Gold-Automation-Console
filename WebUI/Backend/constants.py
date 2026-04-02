@@ -106,6 +106,8 @@ CONFIG_ROUTER_INTERACTIVE_DIR = CONFIG_DIR / "router_interactive"
 # Data files
 TEMPLATE_FILE = DATA_DIR / "bulk_templates.json"
 ROUTERS_FILE = DATA_DIR / "routers.txt"
+# Server-side SSH credential sets (managed in UI; referenced by id per user)
+SSH_CREDENTIALS_FILE = DATA_DIR / "ssh_credentials.json"
 # JSON-based schedule used by the API and scheduler
 REPORT_SCHEDULE_JSON_FILE = DATA_DIR / "report_schedule.json"
 BACKUP_SCHEDULE_JSON_FILE = DATA_DIR / "backup_schedule.json"

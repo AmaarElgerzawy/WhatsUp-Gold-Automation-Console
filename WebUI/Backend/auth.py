@@ -157,6 +157,30 @@ def check_privilege(user: Dict, required_privilege: str) -> bool:
     return required_privilege in user_privileges
 
 
+def user_has_admin_access(user: Dict) -> bool:
+    return "admin_access" in user.get("privileges", [])
+
+
+def get_allowed_credential_ids_for_user(user: Dict):
+    """
+    None = user may use any saved SSH credential (admin).
+    Empty set = no saved credentials; manual entry only.
+    """
+    if user_has_admin_access(user):
+        return None
+    raw = user.get("credential_ids")
+    if not isinstance(raw, list):
+        return set()
+    return {str(x) for x in raw if x}
+
+
+def is_credential_allowed_for_user(user: Dict, credential_id: str) -> bool:
+    allowed = get_allowed_credential_ids_for_user(user)
+    if allowed is None:
+        return True
+    return credential_id in allowed
+
+
 def require_privilege(privilege: str):
     """Dependency to require a specific privilege."""
     def privilege_checker(current_user: Dict = Depends(get_current_user)) -> Dict:

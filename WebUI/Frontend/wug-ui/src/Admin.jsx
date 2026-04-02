@@ -14,12 +14,14 @@ export default function Admin() {
   const [dbConnection, setDbConnection] = useState("");
   const [dbLoading, setDbLoading] = useState(false);
   const [dbSaving, setDbSaving] = useState(false);
+  const [vaultCredentials, setVaultCredentials] = useState([]);
   const [formData, setFormData] = useState({
     username: "",
     password: "",
     email: "",
     role: "operator",
     privileges: [],
+    credentialIds: [],
   });
 
   useEffect(() => {
@@ -127,6 +129,12 @@ export default function Admin() {
         if (res.ok) {
           setUsers(await res.json());
         }
+        const vaultRes = await apiCall("admin/credentials");
+        if (vaultRes.ok) {
+          setVaultCredentials(await vaultRes.json());
+        } else {
+          setVaultCredentials([]);
+        }
       } else if (activeTab === "activity") {
         try {
           const res = await apiCall("admin/activity?limit=500");
@@ -203,6 +211,9 @@ export default function Admin() {
       const roleToUse = formData.role === "custom" ? "custom" : formData.role;
       fd.append("role", roleToUse);
       fd.append("privileges_json", JSON.stringify(formData.privileges));
+      const cids =
+        formData.privileges.includes("admin_access") ? [] : formData.credentialIds || [];
+      fd.append("credential_ids_json", JSON.stringify(cids));
 
       const res = await apiCall("admin/users", {
         method: "POST",
@@ -216,7 +227,14 @@ export default function Admin() {
       }
 
       setShowUserForm(false);
-      setFormData({ username: "", password: "", email: "", role: "operator" });
+      setFormData({
+        username: "",
+        password: "",
+        email: "",
+        role: "operator",
+        privileges: [],
+        credentialIds: [],
+      });
       loadData();
     } catch (e) {
       alert(`Error: ${e.toString()}`);
@@ -246,6 +264,9 @@ export default function Admin() {
       );
       // Always send privileges to allow granular control
       fd.append("privileges_json", JSON.stringify(formData.privileges));
+      const cids =
+        formData.privileges.includes("admin_access") ? [] : formData.credentialIds || [];
+      fd.append("credential_ids_json", JSON.stringify(cids));
 
       const res = await apiCall(`admin/users/${editingUser.id}`, {
         method: "PUT",
@@ -266,6 +287,7 @@ export default function Admin() {
         email: "",
         role: "operator",
         privileges: [],
+        credentialIds: [],
       });
       loadData();
     } catch (e) {
@@ -302,6 +324,7 @@ export default function Admin() {
       role: user.role,
       active: user.active,
       privileges: user.privileges || [],
+      credentialIds: user.credential_ids || [],
     });
     setShowUserForm(true);
   };
@@ -315,20 +338,38 @@ export default function Admin() {
       email: "",
       role: "operator",
       privileges: [],
+      credentialIds: [],
     });
   };
 
   const togglePrivilege = (privilegeId) => {
     setFormData((prev) => {
       const current = prev.privileges || [];
+      let nextPrivileges;
       if (current.includes(privilegeId)) {
+        nextPrivileges = current.filter((p) => p !== privilegeId);
+      } else {
+        nextPrivileges = [...current, privilegeId];
+      }
+      const next = { ...prev, privileges: nextPrivileges };
+      if (nextPrivileges.includes("admin_access")) {
+        next.credentialIds = [];
+      }
+      return next;
+    });
+  };
+
+  const toggleCredentialId = (credentialId) => {
+    setFormData((prev) => {
+      if (prev.privileges?.includes("admin_access")) return prev;
+      const cur = prev.credentialIds || [];
+      if (cur.includes(credentialId)) {
         return {
           ...prev,
-          privileges: current.filter((p) => p !== privilegeId),
+          credentialIds: cur.filter((id) => id !== credentialId),
         };
-      } else {
-        return { ...prev, privileges: [...current, privilegeId] };
       }
+      return { ...prev, credentialIds: [...cur, credentialId] };
     });
   };
 
@@ -423,6 +464,7 @@ export default function Admin() {
                   email: "",
                   role: "operator",
                   privileges: [],
+                  credentialIds: [],
                 });
                 setShowUserForm(true);
               }}
@@ -578,6 +620,80 @@ export default function Admin() {
                   )}
                 </div>
 
+                {!formData.privileges.includes("admin_access") && (
+                  <div className="form-group" style={{ gridColumn: "1 / -1" }}>
+                    <label className="form-label">
+                      SSH credential sets this user may use
+                    </label>
+                    <p
+                      className="card-subtitle"
+                      style={{ marginTop: 0, marginBottom: 8, fontSize: 12 }}
+                    >
+                      Users only see and can run jobs with saved credentials listed
+                      here. Leave none selected to require manual username/password on
+                      router pages.
+                    </p>
+                    {vaultCredentials.length === 0 ? (
+                      <p style={{ fontSize: 12, color: "#9ca3af" }}>
+                        No credential sets in the vault yet. Add them under
+                        Credentials (admin).
+                      </p>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(240px, 1fr))",
+                          gap: 10,
+                        }}
+                      >
+                        {vaultCredentials.map((vc) => (
+                          <label
+                            key={vc.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: 8,
+                              padding: 10,
+                              borderRadius: 6,
+                              border: "1px solid rgba(148, 163, 184, 0.3)",
+                              cursor: "pointer",
+                              background: (
+                                formData.credentialIds || []
+                              ).includes(vc.id)
+                                ? "rgba(34, 197, 94, 0.1)"
+                                : "transparent",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={(formData.credentialIds || []).includes(
+                                vc.id,
+                              )}
+                              onChange={() => toggleCredentialId(vc.id)}
+                              style={{ marginTop: 2 }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 500, fontSize: 13 }}>
+                                {vc.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "#9ca3af",
+                                  marginTop: 2,
+                                }}
+                              >
+                                {vc.username}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {editingUser && (
                   <div className="form-group">
                     <label className="form-label">
@@ -656,6 +772,22 @@ export default function Admin() {
                     >
                       Privileges: {user.privileges.join(", ")}
                     </div>
+                    {user.privileges?.includes("admin_access") ? (
+                      <div
+                        style={{ marginTop: 4, fontSize: 11, color: "#6b7280" }}
+                      >
+                        SSH credentials: all (admin)
+                      </div>
+                    ) : (
+                      <div
+                        style={{ marginTop: 4, fontSize: 11, color: "#6b7280" }}
+                      >
+                        SSH credential sets:{" "}
+                        {(user.credential_ids || []).length === 0
+                          ? "none (manual entry only)"
+                          : `${(user.credential_ids || []).length} assigned`}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button

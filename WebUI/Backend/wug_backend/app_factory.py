@@ -4,7 +4,7 @@ import asyncio
 import os
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +27,8 @@ from auth import (
     PAGE_PRIVILEGES,
     ROLE_PRIVILEGES,
     AVAILABLE_PRIVILEGES,
+    user_has_admin_access,
+    get_allowed_credential_ids_for_user,
 )
 from ad_auth import ad_login_and_get_user
 from constants import (
@@ -64,6 +66,7 @@ from constants import (
     CONFIG_PREFIX_INTERACTIVE,
     CONFIG_PREFIX_SIMPLE,
     ROUTERS_FILE,
+    SSH_CREDENTIALS_FILE,
     REPORT_SCHEDULE_JSON_FILE,
     BACKUP_SCHEDULE_JSON_FILE,
     get_connection_string,
@@ -85,8 +88,41 @@ from wug_backend.services.backup_schedule_config import (
     save_backup_schedule,
     validate_backup_schedule,
 )
+from wug_backend.services.router_credential_resolver import resolve_ssh_for_router_run
+from wug_backend.repos import ssh_credentials_repo
 from wug_backend.utils.file_utils import FileNameService
 from wug_backend.utils.log_utils import LogCollector, OutputSanitizer, LogWriter
+
+
+def _parse_credential_ids_json(raw: Optional[str]) -> Optional[List[str]]:
+    if raw is None or not str(raw).strip():
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid credential_ids JSON: {e}") from e
+    if not isinstance(data, list):
+        raise HTTPException(status_code=400, detail="credential_ids must be a list")
+    return [str(x) for x in data if x]
+
+
+def _validate_credential_ids_exist(ids: List[str]) -> None:
+    if not ids:
+        return
+    all_creds = ssh_credentials_repo.load_all(SSH_CREDENTIALS_FILE)
+    known = {c.get("id") for c in all_creds}
+    invalid = [x for x in ids if x not in known]
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Unknown credential id(s): {invalid}")
+
+
+def _credential_public_meta(c: dict) -> dict:
+    return {
+        "id": c.get("id"),
+        "name": c.get("name") or "",
+        "username": c.get("username") or "",
+        "description": c.get("description") or "",
+    }
 
 
 def create_app() -> FastAPI:
@@ -224,20 +260,28 @@ def create_app() -> FastAPI:
         routers: str = Form(...),
         device_type_default: str = Form("cisco_ios"),
         tasks_json: str = Form(...),
-        username: str = Form(...),
-        password: str = Form(...),
+        username: str = Form(""),
+        password: str = Form(""),
         enable_password: str = Form(""),
+        credential_id: str = Form(""),
         config_name: str = Form(""),
         log_name: str = Form(""),
         current_user: dict = Depends(require_privilege("router_commands")),
     ):
+        u, p, en = resolve_ssh_for_router_run(
+            current_user,
+            credential_id or None,
+            username,
+            password,
+            enable_password,
+        )
         return router_service.run_interactive(
             routers=routers,
             device_type_default=device_type_default,
             tasks_json=tasks_json,
-            username=username,
-            password=password,
-            enable_password=enable_password,
+            username=u,
+            password=p,
+            enable_password=en,
             config_name=config_name,
             log_name=log_name,
             current_user=current_user,
@@ -249,25 +293,151 @@ def create_app() -> FastAPI:
         routers: str = Form(...),
         config: str = Form(...),
         device_type_default: str = Form("cisco_ios"),
-        username: str = Form(...),
-        password: str = Form(...),
+        username: str = Form(""),
+        password: str = Form(""),
         enable_password: str = Form(""),
+        credential_id: str = Form(""),
         config_name: str = Form(""),
         log_name: str = Form(""),
         current_user: dict = Depends(require_privilege("router_commands")),
     ):
+        u, p, en = resolve_ssh_for_router_run(
+            current_user,
+            credential_id or None,
+            username,
+            password,
+            enable_password,
+        )
         return router_service.run_simple(
             routers=routers,
             config=config,
             device_type_default=device_type_default,
-            username=username,
-            password=password,
-            enable_password=enable_password,
+            username=u,
+            password=p,
+            enable_password=en,
             config_name=config_name,
             log_name=log_name,
             current_user=current_user,
             filename_service=filename_service,
         )
+
+    # ================= SSH CREDENTIALS (eligible = metadata only; secrets server-side) =================
+    @app.get("/credentials/eligible")
+    def list_eligible_credentials(current_user: dict = Depends(get_current_user)):
+        rows = ssh_credentials_repo.load_all(SSH_CREDENTIALS_FILE)
+        allowed = get_allowed_credential_ids_for_user(current_user)
+        if allowed is None:
+            return [_credential_public_meta(c) for c in rows if c.get("id")]
+        return [_credential_public_meta(c) for c in rows if c.get("id") in allowed]
+
+    @app.get("/admin/credentials")
+    def admin_list_credentials(current_user: dict = Depends(require_privilege("admin_access"))):
+        log_activity(current_user["id"], "list_ssh_credentials", "Listed SSH credential vault", "admin")
+        return ssh_credentials_repo.load_all(SSH_CREDENTIALS_FILE)
+
+    @app.post("/admin/credentials")
+    def admin_create_credential(
+        name: str = Form(...),
+        username: str = Form(...),
+        password: str = Form(...),
+        enable_password: str = Form(""),
+        description: str = Form(""),
+        current_user: dict = Depends(require_privilege("admin_access")),
+    ):
+        if not (password or "").strip():
+            raise HTTPException(status_code=400, detail="Password is required for a new credential")
+        try:
+            payload = ssh_credentials_repo.validate_credential_payload(
+                {
+                    "name": name,
+                    "username": username,
+                    "password": password,
+                    "enable_password": enable_password,
+                    "description": description,
+                },
+                is_update=False,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        cid = str(uuid.uuid4())
+        cred = {
+            "id": cid,
+            **payload,
+            "updated_at": datetime.now().isoformat(),
+        }
+        ssh_credentials_repo.upsert(SSH_CREDENTIALS_FILE, cred)
+        log_activity(
+            current_user["id"],
+            "create_ssh_credential",
+            f"Created SSH credential set: {payload['name']}",
+            "admin",
+        )
+        return cred
+
+    @app.put("/admin/credentials/{credential_id}")
+    def admin_update_credential(
+        credential_id: str,
+        name: str = Form(...),
+        username: str = Form(...),
+        password: Optional[str] = Form(None),
+        enable_password: Optional[str] = Form(None),
+        description: str = Form(""),
+        current_user: dict = Depends(require_privilege("admin_access")),
+    ):
+        existing = ssh_credentials_repo.get_by_id(SSH_CREDENTIALS_FILE, credential_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Credential not found")
+        p = existing.get("password") or ""
+        if password is not None and str(password).strip():
+            p = str(password)
+        en = existing.get("enable_password") or ""
+        if enable_password is not None and str(enable_password).strip():
+            en = str(enable_password)
+        cred = {
+            "id": credential_id,
+            "name": name.strip(),
+            "username": username.strip(),
+            "password": p,
+            "enable_password": en,
+            "description": (description or "").strip(),
+            "updated_at": datetime.now().isoformat(),
+        }
+        if not cred["name"] or not cred["username"]:
+            raise HTTPException(status_code=400, detail="Name and username are required")
+        ssh_credentials_repo.upsert(SSH_CREDENTIALS_FILE, cred)
+        log_activity(
+            current_user["id"],
+            "update_ssh_credential",
+            f"Updated SSH credential set: {cred['name']}",
+            "admin",
+        )
+        return cred
+
+    @app.delete("/admin/credentials/{credential_id}")
+    def admin_delete_credential(
+        credential_id: str,
+        current_user: dict = Depends(require_privilege("admin_access")),
+    ):
+        if not ssh_credentials_repo.delete_by_id(SSH_CREDENTIALS_FILE, credential_id):
+            raise HTTPException(status_code=404, detail="Credential not found")
+        users = load_users()
+        changed = False
+        for u in users:
+            if user_has_admin_access(u):
+                continue
+            cids = u.get("credential_ids")
+            if isinstance(cids, list) and credential_id in cids:
+                u["credential_ids"] = [x for x in cids if x != credential_id]
+                changed = True
+        if changed:
+            save_users(users)
+        log_activity(
+            current_user["id"],
+            "delete_ssh_credential",
+            f"Deleted SSH credential id: {credential_id}",
+            "admin",
+        )
+        return {"status": "deleted"}
 
     # ================= AUTHENTICATION =================
     @app.post("/auth/login")
@@ -301,6 +471,7 @@ def create_app() -> FastAPI:
                 "email": user.get("email", ""),
                 "role": user["role"],
                 "privileges": user.get("privileges", []),
+                "credential_ids": user.get("credential_ids") if isinstance(user.get("credential_ids"), list) else [],
             },
         }
 
@@ -312,6 +483,9 @@ def create_app() -> FastAPI:
             "email": current_user.get("email", ""),
             "role": current_user["role"],
             "privileges": current_user.get("privileges", []),
+            "credential_ids": current_user.get("credential_ids")
+            if isinstance(current_user.get("credential_ids"), list)
+            else [],
         }
 
     @app.get("/auth/check-page-access")
@@ -340,6 +514,9 @@ def create_app() -> FastAPI:
                 "privileges": u.get("privileges", []),
                 "active": u.get("active", True),
                 "created_at": u.get("created_at", ""),
+                "credential_ids": u.get("credential_ids")
+                if isinstance(u.get("credential_ids"), list)
+                else [],
             }
             for u in users
         ]
@@ -351,6 +528,7 @@ def create_app() -> FastAPI:
         email: str = Form(""),
         role: str = Form("operator"),
         privileges_json: str = Form(""),
+        credential_ids_json: str = Form(""),
         current_user: dict = Depends(require_privilege("admin_access")),
     ):
         users = load_users()
@@ -391,6 +569,14 @@ def create_app() -> FastAPI:
             "created_at": datetime.now().isoformat(),
         }
 
+        if "admin_access" in privileges:
+            new_user["credential_ids"] = []
+        else:
+            parsed = _parse_credential_ids_json(credential_ids_json)
+            cid_list = parsed if parsed is not None else []
+            _validate_credential_ids_exist(cid_list)
+            new_user["credential_ids"] = cid_list
+
         users.append(new_user)
         save_users(users)
 
@@ -407,6 +593,7 @@ def create_app() -> FastAPI:
             "email": new_user["email"],
             "role": new_user["role"],
             "privileges": new_user["privileges"],
+            "credential_ids": new_user.get("credential_ids", []),
         }
 
     @app.put("/admin/users/{user_id}")
@@ -418,6 +605,7 @@ def create_app() -> FastAPI:
         password: Optional[str] = Form(None),
         active: Optional[bool] = Form(None),
         privileges_json: Optional[str] = Form(None),
+        credential_ids_json: Optional[str] = Form(None),
         current_user: dict = Depends(require_privilege("admin_access")),
     ):
         users = load_users()
@@ -469,6 +657,8 @@ def create_app() -> FastAPI:
                 if invalid:
                     raise HTTPException(status_code=400, detail=f"Invalid privileges: {invalid}")
                 user["privileges"] = privileges
+                if "admin_access" in privileges:
+                    user["credential_ids"] = []
                 if role is not None and role not in ROLE_PRIVILEGES:
                     user["role"] = "custom"
                 elif role is None and user.get("role") not in ROLE_PRIVILEGES:
@@ -481,6 +671,16 @@ def create_app() -> FastAPI:
 
         if active is not None:
             user["active"] = active
+
+        if credential_ids_json is not None and str(credential_ids_json).strip():
+            parsed = _parse_credential_ids_json(credential_ids_json)
+            if parsed is None:
+                parsed = []
+            if "admin_access" in user.get("privileges", []):
+                user["credential_ids"] = []
+            else:
+                _validate_credential_ids_exist(parsed)
+                user["credential_ids"] = parsed
 
         users[user_index] = user
         save_users(users)
@@ -499,6 +699,7 @@ def create_app() -> FastAPI:
             "role": user["role"],
             "privileges": user["privileges"],
             "active": user.get("active", True),
+            "credential_ids": user.get("credential_ids") if isinstance(user.get("credential_ids"), list) else [],
         }
 
     @app.delete("/admin/users/{user_id}")

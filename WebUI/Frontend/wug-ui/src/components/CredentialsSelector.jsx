@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { getAllCredentials, getCredential } from "../utils/credentials";
+import { useState, useEffect, useCallback } from "react";
+import { fetchEligibleCredentials } from "../utils/credentials";
 
 export default function CredentialsSelector({
   selectedId,
@@ -10,19 +10,18 @@ export default function CredentialsSelector({
   const [credentials, setCredentials] = useState([]);
   const [showManual, setShowManual] = useState(!selectedId);
 
-  const loadCredentials = () => {
-    const creds = getAllCredentials();
-    setCredentials(creds);
-    if (creds.length === 0 && !showManualEntry) {
+  const loadCredentials = useCallback(async () => {
+    const creds = await fetchEligibleCredentials();
+    setCredentials(Array.isArray(creds) ? creds : []);
+    if ((!creds || creds.length === 0) && !showManualEntry) {
       setShowManual(true);
     }
-  };
+  }, [showManualEntry]);
 
   useEffect(() => {
     loadCredentials();
-  }, []);
+  }, [loadCredentials]);
 
-  // Refresh when localStorage changes (e.g., credentials added/removed)
   useEffect(() => {
     const handleStorageChange = () => {
       loadCredentials();
@@ -31,13 +30,12 @@ export default function CredentialsSelector({
       }
     };
     window.addEventListener("storage", handleStorageChange);
-    // Also listen to custom event for same-window updates
     window.addEventListener("credentialsUpdated", handleStorageChange);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("credentialsUpdated", handleStorageChange);
     };
-  }, [onCredentialsChange]);
+  }, [loadCredentials, onCredentialsChange]);
 
   const handleSelect = (id) => {
     if (id === "manual") {
@@ -46,12 +44,11 @@ export default function CredentialsSelector({
       return;
     }
 
-    const cred = getCredential(id);
+    const cred = credentials.find((c) => c.id === id);
     if (cred) {
       setShowManual(false);
       onSelect(cred);
     } else {
-      // Credential not found, fall back to manual
       setShowManual(true);
       onSelect(null);
     }
@@ -81,7 +78,7 @@ export default function CredentialsSelector({
           <span className="helper-text" style={{ fontSize: 11 }}>
             {credentials.length > 0
               ? "Or enter credentials manually below"
-              : "No saved credentials. Enter manually or create one in the Credentials page."}
+              : "No saved credentials assigned to you. Enter manually, or ask an administrator to assign credential sets."}
           </span>
         </div>
       )}

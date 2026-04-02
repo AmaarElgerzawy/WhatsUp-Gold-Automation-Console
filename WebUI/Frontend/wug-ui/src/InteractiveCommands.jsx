@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import CredentialsSelector from "./components/CredentialsSelector";
-import { getAllCredentials } from "./utils/credentials";
+import { fetchEligibleCredentials } from "./utils/credentials";
 import { apiCall } from "./utils/api";
 
 export default function InteractiveCommands() {
@@ -19,24 +19,28 @@ export default function InteractiveCommands() {
   const [logName, setLogName] = useState("");
 
   useEffect(() => {
-    const creds = getAllCredentials();
-    if (creds.length > 0 && !selectedCredId) {
-      // Auto-select first credential if available
+    let cancelled = false;
+    (async () => {
+      const creds = await fetchEligibleCredentials();
+      if (cancelled || !creds?.length) return;
       const firstCred = creds[0];
       setSelectedCredId(firstCred.id);
       setUsername(firstCred.username || "");
-      setPassword(firstCred.password || "");
-      setEnablePassword(firstCred.enablePassword || "");
+      setPassword("");
+      setEnablePassword("");
       setShowManualFields(false);
-    }
-  }, [selectedCredId]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleCredentialSelect = (cred) => {
     if (cred) {
       setSelectedCredId(cred.id);
-      setUsername(cred.username);
-      setPassword(cred.password);
-      setEnablePassword(cred.enablePassword || "");
+      setUsername(cred.username || "");
+      setPassword("");
+      setEnablePassword("");
       setShowManualFields(false);
     } else {
       setSelectedCredId(null);
@@ -76,13 +80,15 @@ export default function InteractiveCommands() {
       alert("Please add at least one task");
       return;
     }
-    if (!username.trim()) {
-      alert("Please enter username or select a saved credential");
-      return;
-    }
-    if (!password.trim()) {
-      alert("Please enter password or select a saved credential");
-      return;
+    if (!selectedCredId) {
+      if (!username.trim()) {
+        alert("Please enter username or select a saved credential");
+        return;
+      }
+      if (!password.trim()) {
+        alert("Please enter password or select a saved credential");
+        return;
+      }
     }
 
     setLoading(true);
@@ -96,9 +102,16 @@ export default function InteractiveCommands() {
       (deviceTypeDefault || "cisco_ios").trim(),
     );
     formData.append("tasks_json", JSON.stringify(tasks, null, 2));
-    formData.append("username", username.trim());
-    formData.append("password", password.trim());
-    formData.append("enable_password", enablePassword.trim() || "");
+    if (selectedCredId) {
+      formData.append("credential_id", selectedCredId);
+      formData.append("username", "");
+      formData.append("password", "");
+      formData.append("enable_password", "");
+    } else {
+      formData.append("username", username.trim());
+      formData.append("password", password.trim());
+      formData.append("enable_password", enablePassword.trim() || "");
+    }
     formData.append("config_name", configName.trim());
     formData.append("log_name", logName.trim());
 
