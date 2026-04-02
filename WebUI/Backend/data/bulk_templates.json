@@ -10,11 +10,12 @@
   "update": [
     "sDisplayName",
     "sGroupName",
-    "DeviceType",
+    "snetworkaddress",
     "NewDeviceGroup",
     "NetworkAddress",
     "NetworkName",
-    "Notes"
+    "Notes",
+    "DeviceTypr"
   ],
   "delete": [
     "sDisplayName",

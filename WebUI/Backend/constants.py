@@ -66,10 +66,10 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 # ================= DIRECTORY PATHS =================
 BASEDIR = Path(__file__).resolve().parent
 
-# Scripts directories
-SCRIPTS_DIR = BASEDIR / "scripts"
-BULK_SCRIPTS_DIR = SCRIPTS_DIR / "bulk"
-ROUTER_SCRIPTS_DIR = SCRIPTS_DIR / "routers"
+# Legacy scripts directory removed. Code now lives in wug_backend/.
+SCRIPTS_DIR = BASEDIR / "wug_backend"
+BULK_SCRIPTS_DIR = SCRIPTS_DIR / "runners"
+ROUTER_SCRIPTS_DIR = SCRIPTS_DIR / "runners"
 BACKUP_SCRIPTS_DIR = SCRIPTS_DIR / "backup"
 REPORTING_SCRIPTS_DIR = SCRIPTS_DIR / "reporting"
 
@@ -94,7 +94,7 @@ RECEIVER = os.environ.get("WUG_EMAIL_RECEIVER", "snipergolden1234@gmail.com")
 DATA_DIR = BASEDIR / "data"
 CONFIG_DIR = DATA_DIR / "configs"
 LOG_DIR = DATA_DIR / "logs"
-BACKUP_BASE_DIR = BACKUP_SCRIPTS_DIR / "backups"
+BACKUP_BASE_DIR = DATA_DIR / "backups"
 
 # Configuration subdirectories
 CONFIG_BULK_ADD_DIR = CONFIG_DIR / "bulk_add"
@@ -105,18 +105,18 @@ CONFIG_ROUTER_INTERACTIVE_DIR = CONFIG_DIR / "router_interactive"
 
 # Data files
 TEMPLATE_FILE = DATA_DIR / "bulk_templates.json"
-ROUTERS_FILE = BACKUP_SCRIPTS_DIR / "routers.txt"
+ROUTERS_FILE = DATA_DIR / "routers.txt"
 # JSON-based schedule used by the API and scheduler
 REPORT_SCHEDULE_JSON_FILE = DATA_DIR / "report_schedule.json"
 USERS_FILE = DATA_DIR / "users.json"
 ACTIVITY_LOG_FILE = DATA_DIR / "activity_log.json"
 
 # ================= BULK OPERATION CONSTANTS =================
-# Bulk operation scripts
+# Bulk operation runners (invoked via `python -m ...`)
 SCRIPTS = {
-    "add": str(BULK_SCRIPTS_DIR / "BulkAdd-WUGv14.py"),
-    "update": str(BULK_SCRIPTS_DIR / "BulkUpdate-WUGv14.py"),
-    "delete": str(BULK_SCRIPTS_DIR / "BulkDelete-WUGv14.py"),
+    "add": "wug_backend.runners.bulk_add",
+    "update": "wug_backend.runners.bulk_update",
+    "delete": "wug_backend.runners.bulk_delete",
 }
 
 # CSV filenames for bulk operations

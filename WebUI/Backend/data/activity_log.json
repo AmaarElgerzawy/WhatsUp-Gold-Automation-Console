@@ -1,58 +1,58 @@
 [
   {
-    "timestamp": "2026-03-28T15:34:06.028806",
-    "user_id": "ammar_elgerzawy_maxor_com",
+    "timestamp": "2026-04-02T17:40:06.463513",
+    "user_id": "admin",
     "action": "list_report_groups",
     "details": "Viewed device groups for reports",
     "page": "reports"
   },
   {
-    "timestamp": "2026-03-28T15:34:06.040781",
-    "user_id": "ammar_elgerzawy_maxor_com",
+    "timestamp": "2026-04-02T17:40:06.474166",
+    "user_id": "admin",
     "action": "list_report_groups",
     "details": "Viewed device groups for reports",
     "page": "reports"
   },
   {
-    "timestamp": "2026-03-28T15:34:06.055737",
-    "user_id": "ammar_elgerzawy_maxor_com",
+    "timestamp": "2026-04-02T17:40:06.485328",
+    "user_id": "admin",
     "action": "list_report_groups",
     "details": "Viewed device groups for reports",
     "page": "reports"
   },
   {
-    "timestamp": "2026-03-28T15:34:06.094226",
-    "user_id": "ammar_elgerzawy_maxor_com",
+    "timestamp": "2026-04-02T17:40:06.515587",
+    "user_id": "admin",
     "action": "view_report_schedule",
     "details": "Viewed empty report schedule",
     "page": "reports"
   },
   {
-    "timestamp": "2026-03-28T15:34:49.788560",
-    "user_id": "m_ezzat_maxor_com",
-    "action": "login",
-    "details": "User m.ezzat@maxor.com logged in",
-    "page": "login"
+    "timestamp": "2026-04-02T17:40:22.714432",
+    "user_id": "admin",
+    "action": "list_users",
+    "details": "Viewed user list",
+    "page": "admin"
   },
   {
-    "timestamp": "2026-03-30T20:56:50.710919",
+    "timestamp": "2026-04-02T17:40:22.729305",
+    "user_id": "admin",
+    "action": "list_users",
+    "details": "Viewed user list",
+    "page": "admin"
+  },
+  {
+    "timestamp": "2026-04-02T17:40:24.679100",
+    "user_id": "admin",
+    "action": "view_activity_log",
+    "details": "Viewed 6 activity log entries",
+    "page": "admin"
+  },
+  {
+    "timestamp": "2026-04-02T17:52:33.517399",
     "user_id": "admin",
     "action": "login",
     "details": "User admin logged in",
     "page": "login"
-  },
-  {
-    "timestamp": "2026-03-30T20:56:53.367191",
-    "user_id": "admin",
-    "action": "list_configs",
-    "details": "Listed configs in bulk_add",
-    "page": "history"
-  },
-  {
-    "timestamp": "2026-03-30T20:56:53.382065",
-    "user_id": "admin",
-    "action": "list_configs",
-    "details": "Listed configs in bulk_add",
-    "page": "history"
   }
 ]
