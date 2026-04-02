@@ -65,6 +65,7 @@ from constants import (
     CONFIG_PREFIX_SIMPLE,
     ROUTERS_FILE,
     REPORT_SCHEDULE_JSON_FILE,
+    BACKUP_SCHEDULE_JSON_FILE,
     get_connection_string,
 )
 
@@ -79,6 +80,11 @@ from wug_backend.services.bulk_service import BulkOperationService
 from wug_backend.services.router_service import RouterCommandService
 from wug_backend.services.backup_service import BackupService
 from wug_backend.services.backup_scheduler import BackupScheduler
+from wug_backend.services.backup_schedule_config import (
+    load_backup_schedule,
+    save_backup_schedule,
+    validate_backup_schedule,
+)
 from wug_backend.utils.file_utils import FileNameService
 from wug_backend.utils.log_utils import LogCollector, OutputSanitizer, LogWriter
 
@@ -162,7 +168,7 @@ def create_app() -> FastAPI:
         activity_simple_commands=ACTIVITY_SIMPLE_COMMANDS,
     )
     backup_service = BackupService()
-    BackupScheduler.from_env(backup_service).install(app)
+    BackupScheduler.create(backup_service, BACKUP_SCHEDULE_JSON_FILE).install(app)
     template_repo = BulkTemplateRepository(template_file=TEMPLATE_FILE, default_encoding=DEFAULT_ENCODING)
     availability_service = AvailabilityReportService()
     uptime_service = DeviceUpTimeReportService()
@@ -727,6 +733,26 @@ def create_app() -> FastAPI:
         log_activity(current_user["id"], "run_backups", "Triggered backup capture", "backups")
         result = backup_service.run_all_backups()
         return result
+
+    @app.get("/backups/schedule")
+    def get_backup_schedule(current_user: dict = Depends(require_privilege("view_backups"))):
+        log_activity(current_user["id"], "view_backup_schedule", "Viewed backup schedule", "backups")
+        return load_backup_schedule(BACKUP_SCHEDULE_JSON_FILE)
+
+    @app.put("/backups/schedule")
+    def put_backup_schedule(payload: dict = Body(...), current_user: dict = Depends(require_privilege("view_backups"))):
+        try:
+            validated = validate_backup_schedule(payload)
+        except (ValueError, TypeError) as e:
+            raise HTTPException(400, str(e))
+        save_backup_schedule(BACKUP_SCHEDULE_JSON_FILE, validated)
+        log_activity(
+            current_user["id"],
+            "save_backup_schedule",
+            f"Updated backup schedule: enabled={validated['enabled']} mode={validated['mode']}",
+            "backups",
+        )
+        return {"status": "saved", "schedule": validated}
 
     @app.get("/backup/routers")
     def get_backup_routers(current_user: dict = Depends(require_privilege("view_backups"))):

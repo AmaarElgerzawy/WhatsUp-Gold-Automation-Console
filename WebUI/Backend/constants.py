@@ -108,6 +108,7 @@ TEMPLATE_FILE = DATA_DIR / "bulk_templates.json"
 ROUTERS_FILE = DATA_DIR / "routers.txt"
 # JSON-based schedule used by the API and scheduler
 REPORT_SCHEDULE_JSON_FILE = DATA_DIR / "report_schedule.json"
+BACKUP_SCHEDULE_JSON_FILE = DATA_DIR / "backup_schedule.json"
 USERS_FILE = DATA_DIR / "users.json"
 ACTIVITY_LOG_FILE = DATA_DIR / "activity_log.json"
 
