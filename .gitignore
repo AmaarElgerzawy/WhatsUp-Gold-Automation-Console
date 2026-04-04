@@ -61,6 +61,11 @@ htmlcov/
 
 # Project specific
 WebUI/Backend/__pycache__/
+WebUI/Backend/data/backups/
+WebUI/Backend/data/logs/
+WebUI/Backend/data/configs/
+WebUI/Backend/data/activity_log.json
+WebUI/Backend/data/routers.txt
 *.pyc
 *.pyo
 
