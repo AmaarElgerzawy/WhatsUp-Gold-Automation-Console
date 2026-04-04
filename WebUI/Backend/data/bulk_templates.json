@@ -11,11 +11,12 @@
     "sDisplayName",
     "sGroupName",
     "sNetworkaddress",
-    "NewDeviceGroup",
+    "DisplayName",
     "NetworkAddress",
     "NetworkName",
     "Notes",
-    "DeviceType"
+    "DeviceType",
+    "DeviceGroup"
   ],
   "delete": [
     "sDisplayName",

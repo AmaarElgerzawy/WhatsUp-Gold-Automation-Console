@@ -1,23 +1,107 @@
 [
   {
-    "timestamp": "2026-04-04T16:41:36.022459",
+    "timestamp": "2026-04-04T18:48:29.253461",
     "user_id": "admin",
     "action": "list_ssh_credentials",
     "details": "Listed SSH credential vault",
     "page": "admin"
   },
   {
-    "timestamp": "2026-04-04T16:48:22.526331",
+    "timestamp": "2026-04-04T18:49:43.420485",
     "user_id": "admin",
-    "action": "list_ssh_credentials",
-    "details": "Listed SSH credential vault",
-    "page": "admin"
+    "action": "bulk_operation",
+    "details": "Executed update operation with 2 devices",
+    "page": "bulk"
   },
   {
-    "timestamp": "2026-04-04T16:48:22.543405",
+    "timestamp": "2026-04-04T18:56:27.841347",
     "user_id": "admin",
-    "action": "list_ssh_credentials",
-    "details": "Listed SSH credential vault",
-    "page": "admin"
+    "action": "bulk_operation",
+    "details": "Executed update operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T18:58:23.266624",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed update operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T18:58:45.497013",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed delete operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T18:58:59.147050",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed add operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T18:59:14.960718",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed add operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:00:36.547818",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed delete operation with 4 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:02:08.522919",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed add operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:02:13.332977",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed add operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:02:23.594994",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed delete operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:02:38.664109",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed delete operation with 4 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:06:22.501553",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed add operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:06:38.043145",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed update operation with 2 devices",
+    "page": "bulk"
+  },
+  {
+    "timestamp": "2026-04-04T19:07:16.424427",
+    "user_id": "admin",
+    "action": "bulk_operation",
+    "details": "Executed delete operation with 2 devices",
+    "page": "bulk"
   }
 ]

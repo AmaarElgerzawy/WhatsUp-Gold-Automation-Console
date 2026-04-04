@@ -33,26 +33,7 @@ class BulkUpdateUseCase:
         except ValueError:
             return None
 
-    def _find_device_id(self, cursor, display_name, group_name):
-        cursor.execute(
-            """
-        SELECT Device.nDeviceID
-        FROM Device
-        JOIN PivotDeviceToGroup
-            ON Device.nDeviceID = PivotDeviceToGroup.nDeviceID
-        JOIN DeviceGroup
-            ON DeviceGroup.nDeviceGroupID = PivotDeviceToGroup.nDeviceGroupID
-        WHERE Device.sDisplayName = ?
-          AND DeviceGroup.sGroupName = ?;
-    """,
-            (display_name, group_name),
-        )
-        row = cursor.fetchone()
-        return row[0] if row else None
-
-    def _find_device_id_by_network_address_and_group(self, cursor, network_address, group_name):
-        if not network_address or not group_name:
-            return None
+    def _find_device_id_by_name_group_ip(self, cursor, display_name, device_group, network_address):
         cursor.execute(
             """
         SELECT Device.nDeviceID
@@ -63,24 +44,11 @@ class BulkUpdateUseCase:
             ON DeviceGroup.nDeviceGroupID = PivotDeviceToGroup.nDeviceGroupID
         JOIN NetworkInterface
             ON Device.nDeviceID = NetworkInterface.nDeviceID
-        WHERE NetworkInterface.sNetworkAddress = ?
-          AND DeviceGroup.sGroupName = ?;
+        WHERE Device.sDisplayName = ?
+          AND DeviceGroup.sGroupName = ?
+          AND NetworkInterface.sNetworkAddress = ?;
     """,
-            (network_address, group_name),
-        )
-        row = cursor.fetchone()
-        return row[0] if row else None
-
-    def _find_device_id_by_network_address(self, cursor, network_address):
-        if not network_address:
-            return None
-        cursor.execute(
-            """
-        SELECT nDeviceID
-        FROM NetworkInterface
-        WHERE sNetworkAddress = ?
-    """,
-            (network_address,),
+            (display_name, device_group, network_address),
         )
         row = cursor.fetchone()
         return row[0] if row else None
@@ -165,33 +133,16 @@ class BulkUpdateUseCase:
         return cursor.rowcount
 
     def _process_row(self, cursor, row_dict):
-        disp = self._safe_str(row_dict.get("sDisplayName"))
-        group_name = self._safe_str(row_dict.get("sGroupName"))
-        lookup_ip = self._safe_str(row_dict.get("NetworkAddress"))
-
-        if not group_name:
-            return False, "sGroupName missing"
-
-        device_id = None
-
-        if lookup_ip:
-            device_id = self._find_device_id_by_network_address_and_group(cursor, lookup_ip, group_name)
-            if not device_id:
-                device_id = self._find_device_id_by_network_address(cursor, lookup_ip)
+        device_id = self._find_device_id_by_name_group_ip(cursor, row_dict["sDisplayName"], row_dict["sDeviceGroup"], row_dict["sNetworkAddress"])
 
         if not device_id:
-            if not disp:
-                return False, "sDisplayName missing"
-            device_id = self._find_device_id(cursor, disp, group_name)
+            return False, "Device not found by sDisplayName, sDeviceGroup, and sNetworkAddress"
 
-        if not device_id:
-            return False, "Device not found (by IP+group, IP-only, or name+group)"
-
-        new_disp = self._safe_str(row_dict.get("newDisplayName") or row_dict.get("NewDisplayName"))
-        new_net_addr = self._safe_str(row_dict.get("newNetworkAddress") or row_dict.get("NewNetworkAddress"))
-        net_name = self._safe_str(row_dict.get("NetworkName"))
-        note = self._safe_str(row_dict.get("Notes"))
-        dev_type = self._safe_int(row_dict.get("DeviceType"))
+        new_disp = row_dict.get("NewDisplayName")
+        new_net_addr = row_dict.get("NewNetworkAddress")
+        net_name = row_dict.get("NewNetworkName")
+        note = row_dict.get("NewNotes")
+        dev_type = self._safe_int(row_dict.get("NewDeviceType"))
         new_group = self._safe_int(row_dict.get("NewDeviceGroup"))
 
         dev_count = self._update_device(cursor, device_id, new_disp, note, dev_type)
@@ -220,42 +171,19 @@ class BulkUpdateUseCase:
             debug(f"CSV headers: {headers}")
 
             for i, row in enumerate(reader, start=1):
-                normalized = {}
-                for k, v in row.items():
-                    key = (k or "").strip()
-                    kl = key.lower()
-
-                    if kl == "displayname":
-                        key = "sDisplayName"
-                    elif kl == "sdisplayname":
-                        key = "sDisplayName"
-                    elif kl in ("groupname", "sgroupname", "devicegroup", "devicegroupname"):
-                        key = "sGroupName"
-                    elif kl in ("snetworkaddress", "networkaddress"):
-                        key = "NetworkAddress"
-                    elif kl in ("newdisplayname",):
-                        key = "newDisplayName"
-                    elif kl in ("newnetworkaddress",):
-                        key = "NewNetworkAddress"
-                    else:
-                        pass
-
-                    normalized[key] = v
-
-                disp = normalized.get("sDisplayName") or ""
-                debug(f"Processing row {i}: {disp}")
+                debug(f"Processing row {i}: {row.get('sDisplayName', '')}")
 
                 try:
-                    ok, info = self._process_row(cur, normalized)
+                    ok, info = self._process_row(cur, row)
                     if ok:
                         conn.commit()
                         successes += 1
                     else:
                         conn.rollback()
-                        failures.append((i, normalized.get("sDisplayName"), info))
+                        failures.append((i, row.get("sDisplayName"), info))
                 except Exception as e:
                     conn.rollback()
-                    failures.append((i, normalized.get("sDisplayName"), str(e)))
+                    failures.append((i, row.get("sDisplayName"), str(e)))
                     print("ERROR: Error traceback:", file=sys.stderr)
                     print(traceback.format_exc(), file=sys.stderr, flush=True)
 

@@ -104,7 +104,7 @@ SET NOCOUNT ON;
             BEST=self._best_state_id,
             TEMP_NETIF=self._temp_default_netif_id,
         )
-
+        
     def execute_from_csv_path(self, csv_path: str) -> int:
         rows = []
         with open(csv_path, newline="", encoding="utf-8-sig") as f:
@@ -126,11 +126,11 @@ SET NOCOUNT ON;
                 cursor.execute(
                     self._sql,
                     r["DisplayName"],
-                    int(r["DeviceType"]),
+                    r["DeviceType"],
                     r.get("Notes", ""),
                     r["NetworkAddress"],
                     r["NetworkName"],
-                    int(r["DeviceGroup"]),
+                    r["DeviceGroup"],
                 )
                 conn.commit()
                 print(f"SUCCESS: Inserted row {row_num} - {r['DisplayName']}", flush=True)
