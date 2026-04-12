@@ -9,14 +9,14 @@
   ],
   "update": [
     "sDisplayName",
-    "sGroupName",
-    "sNetworkaddress",
-    "DisplayName",
-    "NetworkAddress",
-    "NetworkName",
-    "Notes",
-    "DeviceType",
-    "DeviceGroup"
+    "sDeviceGroup",
+    "sNetworkAddress",
+    "NewDisplayName",
+    "NewNetworkAddress",
+    "NewNetworkName",
+    "NewNotes",
+    "NewDeviceType",
+    "NewDeviceGroup"
   ],
   "delete": [
     "sDisplayName",

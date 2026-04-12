@@ -43,18 +43,6 @@
     "created_at": "2026-03-28T15:34:49.787701"
   },
   {
-    "id": "ammar_elgerzawy_maxor_com",
-    "username": "ammar.elgerzawy@maxor.com",
-    "email": "ammar.elgerzawy@maxor.com",
-    "password_hash": "",
-    "role": "custom",
-    "privileges": [
-      "manage_reports"
-    ],
-    "active": true,
-    "created_at": "2026-03-28T15:33:26.379646"
-  },
-  {
     "id": "mahmoud_ezz_maxor_com",
     "username": "mahmoud.ezz@maxor.com",
     "email": "mahmoud.ezz@maxor.com",
@@ -65,5 +53,17 @@
     ],
     "active": true,
     "created_at": "2026-04-02T17:22:53.411435"
+  },
+  {
+    "id": "ammar_elgerzawy_maxor_com",
+    "username": "ammar.elgerzawy@maxor.com",
+    "email": "ammar.elgerzawy@maxor.com",
+    "password_hash": "",
+    "role": "custom",
+    "privileges": [
+      "manage_reports"
+    ],
+    "active": true,
+    "created_at": "2026-03-28T15:33:26.379646"
   }
 ]

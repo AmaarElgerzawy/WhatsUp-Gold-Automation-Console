@@ -1,0 +1,34 @@
+{
+  "columns": [
+    "group",
+    "type",
+    "report_type",
+    "run_day",
+    "run_time",
+    "period_start_day",
+    "period_start_time",
+    "period_end_day",
+    "period_end_time",
+    "run_day_of_month",
+    "availability_period",
+    "availability_window_start",
+    "availability_window_end",
+    "uptime_period",
+    "uptime_window_start",
+    "uptime_window_end"
+  ],
+  "rows": [
+    {
+      "group": "ECC",
+      "report_type": "both",
+      "type": "weekly",
+      "run_day": "sun",
+      "run_time": "14:30",
+      "period_start_day": "fri",
+      "period_start_time": "00:00",
+      "period_end_day": "sun",
+      "period_end_time": "10:00",
+      "id": "7d7c78ebad924b7bad939de80f45266c"
+    }
+  ]
+}
