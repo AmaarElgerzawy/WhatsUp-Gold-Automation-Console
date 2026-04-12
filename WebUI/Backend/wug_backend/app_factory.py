@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 import io
@@ -66,6 +66,7 @@ from constants import (
     CONFIG_PREFIX_INTERACTIVE,
     CONFIG_PREFIX_SIMPLE,
     ROUTERS_FILE,
+    BACKUP_DEVICE_CREDENTIALS_FILE,
     SSH_CREDENTIALS_FILE,
     REPORT_SCHEDULE_JSON_FILE,
     BACKUP_SCHEDULE_JSON_FILE,
@@ -81,6 +82,17 @@ from wug_backend.repos.device_repo import DeviceLookupRepository
 from wug_backend.repos.template_repo import BulkTemplateRepository
 from wug_backend.services.bulk_service import BulkOperationService
 from wug_backend.services.router_service import RouterCommandService
+from wug_backend.backup.backup_collector import load_backup_target_lines
+from wug_backend.repos.backup_device_credentials_repo import (
+    device_row_for_api,
+    load_map as load_backup_device_cred_map,
+    merge_put_devices,
+    migrate_legacy_credential_keys_to_hosts,
+    normalize_routers_editor_save,
+    router_output_lines_to_host_set,
+    save_map as save_backup_device_cred_map,
+    validate_all_targets_have_credentials,
+)
 from wug_backend.services.backup_service import BackupService
 from wug_backend.services.backup_scheduler import BackupScheduler
 from wug_backend.services.backup_schedule_config import (
@@ -905,6 +917,9 @@ def create_app() -> FastAPI:
         return {"status": "renamed", "new_name": f"{sanitized}{old_ext}"}
 
     # ================= Backup =================
+    # Static /backups/... paths MUST be registered before /backups/{device} or FastAPI
+    # will treat e.g. "device-credentials" and "schedule" as {device} and return 404.
+
     @app.get("/backups/devices")
     def list_backup_devices(current_user: dict = Depends(require_privilege("view_backups"))):
         if not BACKUP_BASE_DIR.exists():
@@ -912,25 +927,59 @@ def create_app() -> FastAPI:
         log_activity(current_user["id"], "list_backup_devices", "Listed backup devices", "backups")
         return [d.name for d in BACKUP_BASE_DIR.iterdir() if d.is_dir()]
 
-    @app.get("/backups/{device}")
-    def list_device_configs(device: str, current_user: dict = Depends(require_privilege("view_backups"))):
-        device_dir = BACKUP_BASE_DIR / device
-        if not device_dir.exists():
-            raise HTTPException(404, "Device not found")
-        log_activity(current_user["id"], "list_device_configs", f"Listed configs for {device}", "backups")
-        return [f.name for f in device_dir.iterdir() if f.is_file()]
+    @app.get("/backups/device-credentials")
+    def get_backup_device_credentials(
+        response: Response,
+        current_user: dict = Depends(require_privilege("view_backups")),
+    ):
+        targets = load_backup_target_lines(ROUTERS_FILE)
+        stored = load_backup_device_cred_map(BACKUP_DEVICE_CREDENTIALS_FILE)
+        log_activity(
+            current_user["id"],
+            "view_backup_device_credentials",
+            f"Viewed backup SSH credentials for {len(targets)} target(s)",
+            "backups",
+        )
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return {
+            "devices": [device_row_for_api(t, stored.get(t)) for t in targets],
+        }
 
-    @app.get("/backups/{device}/{filename}")
-    def view_backup_file(device: str, filename: str, current_user: dict = Depends(require_privilege("view_backups"))):
-        file_path = BACKUP_BASE_DIR / device / filename
-        if not file_path.exists():
-            raise HTTPException(404, "File not found")
-        log_activity(current_user["id"], "view_backup", f"Viewed {device}/{filename}", "backups")
-        return file_path.read_text(encoding="utf-8", errors="ignore")
+    @app.put("/backups/device-credentials")
+    def put_backup_device_credentials(
+        payload: dict = Body(...),
+        current_user: dict = Depends(require_privilege("view_backups")),
+    ):
+        devices_payload = payload.get("devices")
+        if not isinstance(devices_payload, list):
+            raise HTTPException(status_code=400, detail="Request body must include a 'devices' array")
+        targets = load_backup_target_lines(ROUTERS_FILE)
+        existing = load_backup_device_cred_map(BACKUP_DEVICE_CREDENTIALS_FILE)
+        merged, err = merge_put_devices(existing, devices_payload, targets)
+        if err:
+            raise HTTPException(status_code=400, detail=err)
+        save_backup_device_cred_map(BACKUP_DEVICE_CREDENTIALS_FILE, merged)
+        log_activity(
+            current_user["id"],
+            "save_backup_device_credentials",
+            f"Saved backup SSH credentials for {len(merged)} target(s)",
+            "backups",
+        )
+        return {"status": "saved", "count": len(merged)}
 
     @app.post("/backups/run")
     def run_backups_now(current_user: dict = Depends(require_privilege("view_backups"))):
-        # Synchronous run: captures stdout/stderr from the runner and returns it.
+        targets = load_backup_target_lines(ROUTERS_FILE)
+        if not targets:
+            raise HTTPException(
+                status_code=400,
+                detail="No backup targets in data/routers.txt. Add lines under Backup routers.",
+            )
+        creds = load_backup_device_cred_map(BACKUP_DEVICE_CREDENTIALS_FILE)
+        missing = validate_all_targets_have_credentials(targets, creds)
+        if missing:
+            raise HTTPException(status_code=400, detail=missing)
         log_activity(current_user["id"], "run_backups", "Triggered backup capture", "backups")
         result = backup_service.run_all_backups()
         return result
@@ -955,20 +1004,63 @@ def create_app() -> FastAPI:
         )
         return {"status": "saved", "schedule": validated}
 
+    @app.get("/backups/{device}")
+    def list_device_configs(device: str, current_user: dict = Depends(require_privilege("view_backups"))):
+        device_dir = BACKUP_BASE_DIR / device
+        if not device_dir.exists():
+            raise HTTPException(404, "Device not found")
+        log_activity(current_user["id"], "list_device_configs", f"Listed configs for {device}", "backups")
+        return [f.name for f in device_dir.iterdir() if f.is_file()]
+
+    @app.get("/backups/{device}/{filename}")
+    def view_backup_file(device: str, filename: str, current_user: dict = Depends(require_privilege("view_backups"))):
+        file_path = BACKUP_BASE_DIR / device / filename
+        if not file_path.exists():
+            raise HTTPException(404, "File not found")
+        log_activity(current_user["id"], "view_backup", f"Viewed {device}/{filename}", "backups")
+        return file_path.read_text(encoding="utf-8", errors="ignore")
+
     @app.get("/backup/routers")
-    def get_backup_routers(current_user: dict = Depends(require_privilege("view_backups"))):
+    def get_backup_routers(
+        response: Response,
+        current_user: dict = Depends(require_privilege("view_backups")),
+    ):
         if not ROUTERS_FILE.exists():
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
             return {"content": ""}
         log_activity(current_user["id"], "view_backup_routers", "Viewed backup routers list", "backups")
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
         return {"content": ROUTERS_FILE.read_text(encoding="utf-8")}
 
     @app.post("/backup/routers")
     def save_backup_routers(payload: dict = Body(...), current_user: dict = Depends(require_privilege("view_backups"))):
         content = payload.get("content", "")
-        lines = [line.strip() for line in content.splitlines() if line.strip()]
-        ROUTERS_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        log_activity(current_user["id"], "save_backup_routers", f"Updated backup routers list ({len(lines)} routers)", "backups")
-        return {"status": "ok"}
+        out_lines, cred_updates = normalize_routers_editor_save(content)
+        hosts_set = router_output_lines_to_host_set(out_lines)
+        existing = load_backup_device_cred_map(BACKUP_DEVICE_CREDENTIALS_FILE)
+        migrate_legacy_credential_keys_to_hosts(existing, hosts_set)
+        for h, c in cred_updates.items():
+            existing[h] = {
+                "username": c["username"],
+                "password": c["password"],
+                "enable_password": c.get("enable_password") or "",
+            }
+        save_backup_device_cred_map(BACKUP_DEVICE_CREDENTIALS_FILE, existing)
+        text = "\n".join(out_lines) + ("\n" if out_lines else "")
+        ROUTERS_FILE.write_text(text, encoding="utf-8")
+        log_activity(
+            current_user["id"],
+            "save_backup_routers",
+            f"Updated backup routers list ({len(hosts_set)} host(s), {len(cred_updates)} credential line(s) merged)",
+            "backups",
+        )
+        return {
+            "status": "ok",
+            "line_count": len(hosts_set),
+            "credentials_merged": len(cred_updates),
+        }
 
     # ================= Scheduled Report Runner =================
     report_scheduler_enabled = os.environ.get("WUG_REPORT_SCHEDULER_ENABLED", "true").lower() == "true"

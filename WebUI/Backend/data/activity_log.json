@@ -1,30 +1,9 @@
 [
   {
-    "timestamp": "2026-04-12T14:26:15.831314",
+    "timestamp": "2026-04-12T18:39:21.751822",
     "user_id": "admin",
-    "action": "list_report_groups",
-    "details": "Viewed device groups for reports",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-04-12T14:26:15.842594",
-    "user_id": "admin",
-    "action": "list_report_groups",
-    "details": "Viewed device groups for reports",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-04-12T14:26:15.852435",
-    "user_id": "admin",
-    "action": "view_report_schedule",
-    "details": "Viewed empty report schedule",
-    "page": "reports"
-  },
-  {
-    "timestamp": "2026-04-12T14:26:52.805909",
-    "user_id": "admin",
-    "action": "save_report_schedule",
-    "details": "Updated report schedule with 1 entries (JSON)",
-    "page": "reports"
+    "action": "simple_commands",
+    "details": "Ran simple config on 2 router(s)",
+    "page": "routers"
   }
 ]

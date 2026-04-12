@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import BulkChanges from "./BulkChanges";
 import RouterCommands from "./RouterCommands";
 import History from "./History";
@@ -19,6 +19,24 @@ import {
   STATUS_MESSAGES,
   SPACING,
 } from "./utils/constants";
+
+function BackupsPage() {
+  const reloadCredentialRowsRef = useRef(null);
+  const assignReloadCredentialRows = useCallback((fn) => {
+    reloadCredentialRowsRef.current = fn;
+  }, []);
+
+  return (
+    <>
+      <BackupRouters
+        onSaved={async () => {
+          await reloadCredentialRowsRef.current?.();
+        }}
+      />
+      <ConfigBackups assignReloadCredentialRows={assignReloadCredentialRows} />
+    </>
+  );
+}
 
 export default function App() {
   const [page, setPage] = useState("bulk");
@@ -289,8 +307,7 @@ export default function App() {
           )}
           {page === "backups" && (
             <ProtectedRoute page="backups" user={user}>
-              <BackupRouters />
-              <ConfigBackups />
+              <BackupsPage />
             </ProtectedRoute>
           )}
           {page === "reports" && (

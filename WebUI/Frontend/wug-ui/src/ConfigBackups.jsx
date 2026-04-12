@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiCall } from "./utils/api";
 
 const defaultSchedule = {
@@ -9,7 +9,7 @@ const defaultSchedule = {
   run_on_startup: false,
 };
 
-export default function ConfigBackups() {
+export default function ConfigBackups({ assignReloadCredentialRows }) {
   const [devices, setDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState("");
   const [files, setFiles] = useState([]);
@@ -18,12 +18,38 @@ export default function ConfigBackups() {
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [credRows, setCredRows] = useState([]);
+  const [credLoading, setCredLoading] = useState(true);
+  const [credSaving, setCredSaving] = useState(false);
+
+  const loadCredentialRows = useCallback(async () => {
+    setCredLoading(true);
+    try {
+      const res = await apiCall(
+        `backups/device-credentials?_=${Date.now()}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setCredRows(Array.isArray(data.devices) ? data.devices : []);
+      } else {
+        setCredRows([]);
+      }
+    } finally {
+      setCredLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     apiCall("backups/devices")
       .then((res) => res.json())
       .then(setDevices);
   }, []);
+
+  useEffect(() => {
+    assignReloadCredentialRows?.(loadCredentialRows);
+    loadCredentialRows();
+    return () => assignReloadCredentialRows?.(null);
+  }, [assignReloadCredentialRows, loadCredentialRows]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,10 +77,51 @@ export default function ConfigBackups() {
     setDevices(await res.json());
   };
 
+  const updateCredRow = (ip, field, value) => {
+    setCredRows((rows) =>
+      rows.map((r) => (r.ip === ip ? { ...r, [field]: value } : r)),
+    );
+  };
+
+  const saveCredentialRows = async () => {
+    setCredSaving(true);
+    try {
+      const res = await apiCall("backups/device-credentials", {
+        method: "PUT",
+        body: JSON.stringify({ devices: credRows }),
+      });
+      if (!res.ok) {
+        let msg = await res.text();
+        try {
+          const j = JSON.parse(msg);
+          msg = j.detail || msg;
+        } catch {
+          /* keep text */
+        }
+        alert(msg || "Failed to save credentials");
+        return;
+      }
+      await loadCredentialRows();
+    } finally {
+      setCredSaving(false);
+    }
+  };
+
   const runBackups = async () => {
     setRunning(true);
     try {
-      await apiCall("backups/run", { method: "POST" });
+      const res = await apiCall("backups/run", { method: "POST" });
+      if (!res.ok) {
+        let msg = await res.text();
+        try {
+          const j = JSON.parse(msg);
+          msg = j.detail || msg;
+        } catch {
+          /* keep text */
+        }
+        alert(msg || "Backup failed");
+        return;
+      }
       setSelectedDevice("");
       setFiles([]);
       setContent("");
@@ -230,6 +297,127 @@ export default function ConfigBackups() {
             >
               {scheduleSaving ? "Saving…" : "Save schedule"}
             </button>
+          </>
+        )}
+      </section>
+
+      <section className="card" style={{ marginBottom: 16 }}>
+        <h4 className="card-title" style={{ marginBottom: 8 }}>
+          SSH credentials per backup target
+        </h4>
+        <p className="card-subtitle" style={{ marginBottom: 12 }}>
+          After you <strong>Save routers.txt</strong>, each host appears here with{" "}
+          <strong>username</strong>, <strong>password</strong>, and{" "}
+          <strong>enable password</strong> (stored in JSON). The editor above shows only
+          hostnames or IPs. Change secrets here and click <strong>Save credentials</strong>.
+        </p>
+        {credLoading ? (
+          <p className="card-subtitle">Loading targets…</p>
+        ) : credRows.length === 0 ? (
+          <p className="card-subtitle">
+            No lines in the backup routers list yet. Add lines in the editor above,
+            click <strong>Save routers.txt</strong>, and this section will update. If
+            you already saved, confirm the line is not only whitespace or comments.
+          </p>
+        ) : (
+          <>
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: 13,
+                }}
+              >
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "1px solid #334155" }}>
+                    <th style={{ padding: "8px 6px" }}>Host / target</th>
+                    <th style={{ padding: "8px 6px" }}>Username</th>
+                    <th style={{ padding: "8px 6px" }}>Password</th>
+                    <th style={{ padding: "8px 6px" }}>Enable password</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {credRows.map((row) => (
+                    <tr
+                      key={row.ip}
+                      style={{ borderBottom: "1px solid rgba(51,65,85,0.5)" }}
+                    >
+                      <td style={{ padding: "8px 6px", verticalAlign: "middle" }}>
+                        <code style={{ fontSize: 12 }}>
+                          {row.target_label != null && row.target_label !== ""
+                            ? row.target_label
+                            : row.ip}
+                        </code>
+                      </td>
+                      <td style={{ padding: "6px" }}>
+                        <input
+                          className="input"
+                          style={{ minWidth: 120 }}
+                          value={row.username || ""}
+                          onChange={(e) =>
+                            updateCredRow(row.ip, "username", e.target.value)
+                          }
+                          autoComplete="off"
+                        />
+                      </td>
+                      <td style={{ padding: "6px" }}>
+                        <input
+                          className="input"
+                          type="password"
+                          style={{ minWidth: 120 }}
+                          placeholder={
+                            row.password_configured
+                              ? "Leave blank to keep saved"
+                              : "Required"
+                          }
+                          value={row.password || ""}
+                          onChange={(e) =>
+                            updateCredRow(row.ip, "password", e.target.value)
+                          }
+                          autoComplete="new-password"
+                        />
+                      </td>
+                      <td style={{ padding: "6px" }}>
+                        <input
+                          className="input"
+                          type="password"
+                          style={{ minWidth: 120 }}
+                          placeholder={
+                            row.enable_password_configured
+                              ? "Leave blank to keep saved"
+                              : "Optional (defaults to password)"
+                          }
+                          value={row.enable_password || ""}
+                          onChange={(e) =>
+                            updateCredRow(row.ip, "enable_password", e.target.value)
+                          }
+                          autoComplete="new-password"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={saveCredentialRows}
+                disabled={credSaving}
+              >
+                {credSaving ? "Saving…" : "Save credentials"}
+              </button>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={loadCredentialRows}
+                disabled={credLoading}
+              >
+                Reload targets
+              </button>
+            </div>
           </>
         )}
       </section>
