@@ -48,6 +48,35 @@ function BulkChnages() {
     }
   };
 
+  const downloadFullDatabase = async () => {
+    try {
+      const res = await apiCall(`${ENDPOINTS.BULK_FULL_DATABASE}`, {
+        method: "GET",
+      });
+
+      if (!res.ok) {
+        alert(ERROR_MESSAGES.TEMPLATE_DOWNLOAD_FAILED);
+        return;
+      }
+
+      const blob = await res.blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = `Ready_To_Update_Database.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert(ERROR_MESSAGES.TEMPLATE_DOWNLOAD_ERROR);
+    }
+  };
+
   const run = async () => {
     if (!file) {
       alert(ERROR_MESSAGES.NO_FILE_SELECTED);
@@ -118,6 +147,14 @@ function BulkChnages() {
             >
               <span className="button-icon">{ICONS.DOCUMENT}</span>
               {UI_LABELS.DOWNLOAD_TEMPLATE}
+            </button>
+            <button
+              className="button button--ghost button--sm"
+              type="button"
+              onClick={downloadFullDatabase}
+            >
+              <span className="button-icon">{ICONS.DOCUMENT}</span>
+              {UI_LABELS.DOWNLOAD_FULL_DATABASE}
             </button>
           </div>
         </div>

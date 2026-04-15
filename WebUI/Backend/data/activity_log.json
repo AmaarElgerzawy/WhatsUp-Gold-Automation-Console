@@ -1,9 +1,0 @@
-[
-  {
-    "timestamp": "2026-04-12T18:39:21.751822",
-    "user_id": "admin",
-    "action": "simple_commands",
-    "details": "Ran simple config on 2 router(s)",
-    "page": "routers"
-  }
-]

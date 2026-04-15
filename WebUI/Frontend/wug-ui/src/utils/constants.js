@@ -16,6 +16,7 @@ export const ENDPOINTS = {
   // Bulk operations
   RUN_BULK: "run",
   BULK_TEMPLATE: "bulk/template",
+  BULK_FULL_DATABASE: "bulk/database",
 
   // Router commands
   ROUTERS_RUN_INTERACTIVE: "routers/run-interactive",
@@ -181,6 +182,7 @@ export const PAGE_TITLES = {
 export const UI_LABELS = {
   UPLOAD_AND_RUN: "Upload & run",
   DOWNLOAD_TEMPLATE: "Download template",
+  DOWNLOAD_FULL_DATABASE: "Download Ready To Update Database",
   OPERATION: "Operation",
   FILE: "Excel file (.xlsx)",
   CONFIG_NAME: "Config name (optional)",

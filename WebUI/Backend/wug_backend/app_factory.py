@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+import pyodbc
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -263,6 +264,43 @@ def create_app() -> FastAPI:
             media_type=MEDIA_TYPE_EXCEL,
             headers={
                 "Content-Disposition": f'attachment; filename="bulk_{operation}_template.xlsx"'
+            },
+        )
+        
+    @app.get("/bulk/database/")
+    def download_bulk_database(
+        current_user: dict = Depends(require_privilege("bulk_operations")),
+    ):
+
+        sql_query = """SELECT d.sDisplayName AS sDisplayName,
+dg.sGroupName AS sDeviceGroup,
+n.sNetworkAddress AS sNetworkAddress,
+d.sDisplayName AS NewDisplayName,
+n.sNetworkAddress AS NewNetworkAddress,
+n.sNetworkName AS NewNetworkName,
+d.sNote AS NewNotes,
+dt.sDisplayName AS NewDeviceType,
+dg.sGroupName AS NewDeviceGroup
+FROM device d
+JOIN NetworkInterface n       ON d.nDeviceID = n.nDeviceID
+JOIN PivotDeviceToGroup pdg   ON d.nDeviceID = pdg.nDeviceID
+JOIN DeviceGroup dg           ON pdg.nDeviceGroupID = dg.nDeviceGroupID
+JOIN DeviceType dt            ON d.nDeviceTypeID = dt.nDeviceTypeID;
+"""
+        
+        conn = pyodbc.connect(get_connection_string())
+        df = pd.read_sql_query(sql_query, conn)
+
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="WUG Database")
+        buffer.seek(0)
+
+        return StreamingResponse(
+            buffer,
+            media_type=MEDIA_TYPE_EXCEL,
+            headers={
+                "Content-Disposition": f'attachment; filename="Full DataBase.xlsx"'
             },
         )
 
