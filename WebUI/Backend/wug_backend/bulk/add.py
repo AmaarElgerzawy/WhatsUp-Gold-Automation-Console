@@ -126,7 +126,7 @@ SET NOCOUNT ON;
                 poll_interval = r.get("PollInterval") or r.get("nPollInterval")
                 if isinstance(poll_interval, str):
                     poll_interval = poll_interval.strip()
-                    poll_interval = int(poll_interval) if poll_interval else None
+                    poll_interval = poll_interval if poll_interval else None
 
                 cursor.execute(
                     self._sql,
