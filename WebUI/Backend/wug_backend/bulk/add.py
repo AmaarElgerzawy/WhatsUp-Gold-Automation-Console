@@ -41,7 +41,7 @@ SET NOCOUNT ON;
     VALUES (
         ?, ?, NULL, NULL,
         0, NULL, 0, {WORST},
-        {BEST}, NULL, ?, NULL,
+        {BEST}, ?, ?, NULL,
         NULL, NULL, 0,
         0, 0, NULL,
         0, 0,
@@ -123,10 +123,16 @@ SET NOCOUNT ON;
         for r in rows:
             row_num += 1
             try:
+                poll_interval = r.get("PollInterval") or r.get("nPollInterval")
+                if isinstance(poll_interval, str):
+                    poll_interval = poll_interval.strip()
+                    poll_interval = int(poll_interval) if poll_interval else None
+
                 cursor.execute(
                     self._sql,
                     r["DisplayName"],
                     r["DeviceType"],
+                    poll_interval,
                     r.get("Notes", ""),
                     r["NetworkAddress"],
                     r["NetworkName"],
