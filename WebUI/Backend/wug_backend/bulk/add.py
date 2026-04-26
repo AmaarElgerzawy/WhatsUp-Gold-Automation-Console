@@ -105,7 +105,7 @@ SET NOCOUNT ON;
             TEMP_NETIF=self._temp_default_netif_id,
         )
     
-    def clean_name(text):
+    def clean_name(self, text):
         if text is None:
             return ""
         return "".join(char for char in text if ord(char) < 128)
