@@ -130,7 +130,7 @@ SET NOCOUNT ON;
 
                 cursor.execute(
                     self._sql,
-                    r["DisplayName"],
+                    r["DisplayName"].encode("utf-8", 'ignore').decode("utf-8"),
                     r["DeviceType"],
                     poll_interval,
                     r.get("Notes", ""),
