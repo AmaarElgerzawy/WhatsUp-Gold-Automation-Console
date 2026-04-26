@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import csv
 import sys
+import sys
+import codecs
+
+# This prevents the 'charmap' error by forcing the output to handle Unicode
+sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
 
 import pyodbc
 
@@ -121,6 +127,9 @@ SET NOCOUNT ON;
             return 1
 
         conn = pyodbc.connect(self._connection_string)
+        conn.setdecoding(pyodbc.SQL_CHAR, encoding='utf-8')
+        conn.setdecoding(pyodbc.SQL_WCHAR, encoding='utf-8')
+        conn.setencoding(encoding='utf-8')
         cursor = conn.cursor()
         cursor.fast_executemany = False
 
