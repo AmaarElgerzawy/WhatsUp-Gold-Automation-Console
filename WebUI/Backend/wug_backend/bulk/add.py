@@ -41,7 +41,7 @@ SET NOCOUNT ON;
     VALUES (
         ?, ?, NULL, NULL,
         0, NULL, 0, {WORST},
-        {BEST}, CAST(CAST(? AS INT) AS VARCHAR(20)), ?, NULL,
+        {BEST}, CAST(? AS decimal(5,0)), ?, NULL,
         NULL, NULL, 0,
         0, 0, NULL,
         0, 0,
