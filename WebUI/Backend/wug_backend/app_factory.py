@@ -281,7 +281,7 @@ n.sNetworkName AS NewNetworkName,
 d.sNote AS NewNotes,
 dt.sDisplayName AS NewDeviceType,
 dg.sGroupName AS NewDeviceGroup,
-g.nPollInterval AS nPollInterval
+d.nPollInterval AS nPollInterval
 FROM device d
 JOIN NetworkInterface n       ON d.nDeviceID = n.nDeviceID
 JOIN PivotDeviceToGroup pdg   ON d.nDeviceID = pdg.nDeviceID
