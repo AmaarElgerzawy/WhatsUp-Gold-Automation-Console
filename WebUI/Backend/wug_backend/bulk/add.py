@@ -41,7 +41,7 @@ SET NOCOUNT ON;
     VALUES (
         ?, ?, NULL, NULL,
         0, NULL, 0, {WORST},
-        {BEST}, ?, ?, NULL,
+        {BEST}, CAST(? AS INT), ?, NULL,
         NULL, NULL, 0,
         0, 0, NULL,
         0, 0,
