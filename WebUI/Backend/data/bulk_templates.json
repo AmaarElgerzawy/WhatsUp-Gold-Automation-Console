@@ -5,7 +5,8 @@
     "DeviceGroup",
     "NetworkAddress",
     "NetworkName",
-    "Notes"
+    "Notes",
+    "nPollInterval"
   ],
   "update": [
     "sDisplayName",
