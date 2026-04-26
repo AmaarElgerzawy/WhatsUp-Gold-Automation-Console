@@ -104,7 +104,12 @@ SET NOCOUNT ON;
             BEST=self._best_state_id,
             TEMP_NETIF=self._temp_default_netif_id,
         )
-        
+    
+    def clean_name(text):
+        if text is None:
+            return ""
+        return "".join(char for char in text if ord(char) < 128)
+
     def execute_from_csv_path(self, csv_path: str) -> int:
         rows = []
         with open(csv_path, newline="", encoding="utf-8-sig") as f:
@@ -130,7 +135,7 @@ SET NOCOUNT ON;
 
                 cursor.execute(
                     self._sql,
-                    r["DisplayName"].encode("utf-8", 'ignore').decode("utf-8"),
+                    self.clean_name(r["DisplayName"]),
                     r["DeviceType"],
                     poll_interval,
                     r.get("Notes", ""),
